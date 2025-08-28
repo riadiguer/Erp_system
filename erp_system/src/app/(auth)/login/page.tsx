@@ -19,7 +19,7 @@ export default function LoginPage() {
   const { login, error } = useAuth();
   const params = useSearchParams();
   const router = useRouter();
-  const next = params.get('next') || '/';
+  const next = params.get('next') || '/dashboard';
   const [showPassword, setShowPassword] = useState(false);
   const [loginMethod, setLoginMethod] = useState<'email' | 'username'>('email');
 
@@ -156,13 +156,14 @@ export default function LoginPage() {
             </button>
           </form>
 
-          {/* Registration Link */}
-          <p className="mt-4 text-sm text-center text-slate-600">
-            Don't have an account?{' '}
-            <a href="/register" className="underline text-blue-600 hover:text-blue-800 transition-colors">
-              Create one
+          {/* Forgot Password Link */}
+          <p className="mt-3 text-sm text-center">
+            <a href="/forgot-password" className="underline text-slate-600 hover:text-slate-800 transition-colors">
+              Forgot password?
             </a>
           </p>
+
+       
 
           {/* Footer */}
           <div className="pt-4 border-t border-slate-200">

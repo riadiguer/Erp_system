@@ -27,21 +27,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState<string | undefined>(undefined);
 
   const refreshMe = useCallback(async () => {
+    console.log('🔄 refreshMe called');
     try {
       setLoading(true);
       const me = await AuthApi.me();
+      console.log('✅ AuthApi.me() response:', me);
+      console.log('✅ Is user truthy?', !!me);
+      console.log('✅ User object keys:', me ? Object.keys(me) : 'null');
       setUser(me);
-      // unauthenticated on boot is normal → no error message
       setError(undefined);
-    } catch {
+    } catch (error) {
+      console.log('❌ AuthApi.me() failed:', error);
       setUser(null);
       setError(undefined);
     } finally {
       setLoading(false);
+      console.log('✅ Loading set to false');
     }
   }, []);
 
   useEffect(() => {
+    console.log('🚀 AuthProvider mounted, calling refreshMe');
     void refreshMe();
   }, [refreshMe]);
 
@@ -69,10 +75,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
   }, []);
 
-  const value = useMemo(
-    () => ({ user, loading, error, login, logout, refreshMe }),
-    [user, loading, error, login, logout, refreshMe]
-  );
+  const value = useMemo(() => {
+    const authValue = { user, loading, error, login, logout, refreshMe };
+    console.log('🔍 AuthContext value:', { 
+      user: !!user, 
+      userKeys: user ? Object.keys(user) : null,
+      loading, 
+      error 
+    });
+    return authValue;
+  }, [user, loading, error, login, logout, refreshMe]);
 
   return <AuthCtx.Provider value={value}>{children}</AuthCtx.Provider>;
 }

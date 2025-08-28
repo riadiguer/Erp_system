@@ -1,6 +1,7 @@
 import AuthGuard from '@/components/guards/AuthGuard';
 import { Topbar } from '@/components/layout/Topbar';
 import { Sidebar } from '@/components/layout/Sidebar';
+import { Breadcrumbs } from '@/components/layout/Breadcrumbs';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -9,7 +10,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <Topbar />
         <div className="flex flex-1">
           <Sidebar />
-          <main className="flex-1 p-4">{children}</main>
+          <main className="flex-1 p-6">
+            <Breadcrumbs />
+            {children}
+          </main>
         </div>
       </div>
     </AuthGuard>

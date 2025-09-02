@@ -17,6 +17,7 @@ export type Product = {
 };
 
 export type OrderLine = {
+  product_detail: any;
   id: UUID;
   order: UUID;
   product: UUID;
@@ -31,6 +32,7 @@ export type OrderLine = {
 };
 
 export type Order = {
+  sales_point_detail: any;
   id: UUID; code: string; seq: number;
   customer: UUID; customer_detail?: Customer;
   status: 'DRAFT' | 'CONFIRMED' | 'PART_DELIV' | 'DELIVERED' | 'CANCELLED';
@@ -45,7 +47,7 @@ export type OrderLineInput = {
   product: UUID;
   description?: string;
   quantity: number | string;
-  unit_price: number | string;
+  unit_price?: number | string;
   tax_rate?: number | string;
 };
 export type OrderCreateInput = {
@@ -53,6 +55,7 @@ export type OrderCreateInput = {
   currency?: string;
   expected_delivery_date?: string | null;
   notes?: string;
+  sales_point: number; // sales point ID
   lines: OrderLineInput[];
 };
 export type OrderUpdateInput = Partial<Pick<OrderCreateInput, 'expected_delivery_date' | 'notes' | 'lines'>>;
@@ -78,6 +81,16 @@ export type Payment = {
   reference?: string; received_at: string; notes?: string; created_at: string;
 };
 
+export type SalesPoint = {
+  id: number;
+  name: string;
+  slug: string;
+  kind: 'SHOWROOM'|'SOCIAL'|'WHATSAPP'|'WEBSITE'|'MARKET'|'OTHER'|'DEPOT'|'FACTORY';
+  is_active: boolean;
+  meta: Record<string, any>;
+  created_at: string;
+};
+
 // ——— HTTP helpers ———
 const get = <T>(p: string) => apiFetch<T>(p);
 const post = <T>(p: string, body?: any) => apiFetch<T>(p, { method: 'POST', body: body ? JSON.stringify(body) : undefined });
@@ -93,6 +106,13 @@ export const SalesApi = {
   },
   products: {
     list: () => get<Product[]>('/sales/products/'),
+  },
+
+   salesPoints: {
+    list: () => get<SalesPoint[]>('/sales/sales-points/'),
+    create: (payload: Partial<SalesPoint>) => post<SalesPoint>('/sales/sales-points/', payload),
+    update: (id: number, payload: Partial<SalesPoint>) => patch<SalesPoint>(`/sales/sales-points/${id}/`, payload),
+    delete: (id: number) => del<{}>(`/sales/sales-points/${id}/`),
   },
 
   // Orders

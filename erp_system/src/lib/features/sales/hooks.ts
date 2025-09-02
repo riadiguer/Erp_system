@@ -1,5 +1,5 @@
 import useSWR from 'swr';
-import { SalesApi, type Order, type Invoice, type Customer, type Product } from './api';
+import { SalesApi, type Order, type Invoice, type Customer, type Product, SalesPoint } from './api';
 
 export function useOrders() {
   const { data, error, mutate, isValidating } = useSWR<Order[]>('/sales/orders/', SalesApi.orders.list);
@@ -38,3 +38,9 @@ export function useInvoicesByOrder(orderId?: string) {
   const { data, error, mutate } = useSWR<Invoice[]>(key, () => SalesApi.invoices.listByOrder(orderId!));
   return { invoices: data || [], loading: !!orderId && !data && !error, error, refresh: mutate };
 }
+
+export function useSalesPoints() {
+  const { data, error, mutate } = useSWR<SalesPoint[]>('/sales/sales-points/', SalesApi.salesPoints.list);
+  return { salesPoints: data || [], loading: !data && !error, error, refresh: mutate };
+}
+

@@ -45,6 +45,10 @@ export const MENU: MenuItem[] = [
   {
     label: "Users & Roles",
     href: "/settings/users",
-    need: ["users_manage"], // admin-like permission
+     need: ["users_manage", "sales_manage"], // admin-like permission
+      children: [
+      { label: "Users & Roles", href: "/settings/users", need: ["users_manage"] },
+      { label: "Sales Points", href: "/settings/sales-points", need: ["sales_manage"] },
+    ],
   },
 ];

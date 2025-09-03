@@ -172,26 +172,60 @@ export default function OrderDetailPage() {
                 <StatusBadge status={order.status} />
               </div>
               
-              <div className="flex items-center gap-4 text-sm text-gray-600">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-600">
                 <div className="flex items-center gap-2">
                   <div className="w-4 h-4 bg-blue-100 rounded-full flex items-center justify-center">
                     <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
                   </div>
-                  <span className="font-medium">{order.customer_detail?.name}</span>
+                  <div>
+                    <div className="text-xs text-gray-500 uppercase tracking-wide font-medium">Customer</div>
+                    <div className="font-medium text-gray-900">{order.customer_detail?.name}</div>
+                  </div>
                 </div>
+                
+                {order.sales_point_detail && (
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 bg-green-100 rounded-full flex items-center justify-center">
+                      <div className="w-2 h-2 bg-green-600 rounded-full"></div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-gray-500 uppercase tracking-wide font-medium">Sales Point</div>
+                      <div className="font-medium text-gray-900">
+                        {order.sales_point_detail.name}
+                        {order.sales_point_detail.kind !== 'OTHER' && (
+                          <span className="text-gray-600 ml-1">({order.sales_point_detail.kind})</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
                 <div className="flex items-center gap-2">
                   <div className="w-4 h-4 bg-gray-100 rounded-full flex items-center justify-center">
                     <div className="w-2 h-2 bg-gray-600 rounded-full"></div>
                   </div>
-                  <span>{new Date(order.created_at).toLocaleDateString('en-US', { 
-                    year: 'numeric', 
-                    month: 'long', 
-                    day: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit'
-                  })}</span>
+                  <div>
+                    <div className="text-xs text-gray-500 uppercase tracking-wide font-medium">Created</div>
+                    <div className="font-medium text-gray-900">
+                      {new Date(order.created_at).toLocaleDateString('en-US', { 
+                        year: 'numeric', 
+                        month: 'long', 
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </div>
+                  </div>
                 </div>
               </div>
+              
+              {/* Notes Section */}
+              {order.notes && (
+                <div className="mt-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                  <div className="text-xs text-gray-500 uppercase tracking-wide font-medium mb-1">Notes</div>
+                  <div className="text-sm text-gray-700">{order.notes}</div>
+                </div>
+              )}
             </div>
 
             <div className="flex flex-wrap gap-3">
@@ -247,30 +281,41 @@ export default function OrderDetailPage() {
               </tr>
             </thead>
             <tbody>
-              {order.lines.map((ln, index) => (
+                {order.lines.map((ln, index) => (
                 <tr key={ln.id} className={`border-b border-gray-100 hover:bg-gray-50 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-gray-25'}`}>
-                  <td className="py-4 px-4">
-                    <div className="font-medium text-gray-900">{ln.description || `Item ${ln.id}`}</div>
-                  </td>
-                  <td className="py-4 px-4 text-right font-medium">{ln.quantity}</td>
-                  <td className="py-4 px-4 text-right">{ln.unit_price}</td>
-                  <td className="py-4 px-4 text-right">{ln.tax_rate}%</td>
-                  <td className="py-4 px-4 text-right font-medium">{ln.subtotal}</td>
-                  <td className="py-4 px-4 text-right">{ln.tax_amount}</td>
-                  <td className="py-4 px-4 text-right font-semibold text-gray-900">{ln.total}</td>
-                  <td className="py-4 px-4 text-right">
+                    <td className="py-4 px-4">
+                    <div>
+                        {/* Product Name */}
+                        {ln.product_detail?.name && (
+                        <div className="font-medium text-gray-900 mb-1">
+                            {ln.product_detail.name}
+                        </div>
+                        )}
+                        {/* Description */}
+                        <div className={`text-sm ${ln.product_detail?.name ? 'text-gray-600' : 'font-medium text-gray-900'}`}>
+                        {ln.description || `Item ${ln.id}`}
+                        </div>
+                    </div>
+                    </td>
+                    <td className="py-4 px-4 text-right font-medium">{ln.quantity}</td>
+                    <td className="py-4 px-4 text-right">{ln.unit_price}</td>
+                    <td className="py-4 px-4 text-right">{ln.tax_rate}%</td>
+                    <td className="py-4 px-4 text-right font-medium">{ln.subtotal}</td>
+                    <td className="py-4 px-4 text-right">{ln.tax_amount}</td>
+                    <td className="py-4 px-4 text-right font-semibold text-gray-900">{ln.total}</td>
+                    <td className="py-4 px-4 text-right">
                     <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      ln.delivered_qty >= ln.quantity 
+                        ln.delivered_qty >= ln.quantity 
                         ? 'bg-green-100 text-green-800' 
                         : Number(ln.delivered_qty) > 0 
                         ? 'bg-yellow-100 text-yellow-800' 
                         : 'bg-gray-100 text-gray-800'
                     }`}>
-                      {ln.delivered_qty}/{ln.quantity}
+                        {ln.delivered_qty}/{ln.quantity}
                     </span>
-                  </td>
+                    </td>
                 </tr>
-              ))}
+                ))}
             </tbody>
           </table>
         </div>

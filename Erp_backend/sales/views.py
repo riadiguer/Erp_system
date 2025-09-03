@@ -3,7 +3,7 @@ from rest_framework import viewsets, decorators, status, filters
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from .models import Order, DeliveryNote, Invoice, Payment, Product, Customer
+from .models import Order, DeliveryNote, Invoice, Payment, Product, Customer ,SalesPoint
 from .serializers import (
     # Orders
     OrderSerializer, OrderWriteSerializer, OrderUpdateSerializer,
@@ -14,6 +14,9 @@ from .serializers import (
     PaymentSerializer,
     # Refs
     ProductSerializer, CustomerSerializer,
+    # Sales Points
+    SalesPointSerializer,
+
 )
 from .permissions import SalesPermission, InvoicesPermission
 
@@ -35,11 +38,17 @@ class CustomerViewSet(viewsets.ModelViewSet):
     search_fields = ("name", "email", "phone")
     ordering_fields = ("name", "created_at")
 
+class SalesPointViewSet(viewsets.ModelViewSet):
+    queryset = SalesPoint.objects.all().order_by("name")
+    serializer_class = SalesPointSerializer
+    permission_classes = [SalesPermission]  # view requires sales_view, mutate requires sales_manage
+
+
 
 # --------- Orders ----------
 class OrderViewSet(viewsets.ModelViewSet):
     queryset = (
-        Order.objects.select_related("customer")
+        Order.objects.select_related("customer", "sales_point")
         .prefetch_related("lines__product")
         .all()
     )

@@ -3,7 +3,7 @@ from decimal import Decimal
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
 from django.utils import timezone
-
+from django.utils.text import slugify
 
 # ---------- Helpers ----------
 def money(value) -> Decimal:
@@ -96,6 +96,15 @@ class Order(TimeStampedModel):
     subtotal = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0.00"))
     tax_amount = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0.00"))
     total = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0.00"))
+
+    sales_point = models.ForeignKey(
+        "sales.SalesPoint",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=False,
+        related_name="orders",
+        help_text="Where this order was initiated (showroom, social media, etc.)"
+    )
 
     class Meta:
         ordering = ["-created_at"]
@@ -432,3 +441,32 @@ class Payment(TimeStampedModel):
         super().save(*args, **kwargs)
         # Recalcule les totaux et le statut de la facture
         self.invoice.recompute_totals(save=True)
+
+# ---------- Points de vente ----------
+
+class SalesPoint(models.Model):
+    class Kind(models.TextChoices):
+        SHOWROOM = "SHOWROOM", "Showroom / POS"
+        SOCIAL   = "SOCIAL",   "Social media"
+        WHATSAPP = "WHATSAPP", "WhatsApp / Phone"
+        WEBSITE  = "WEBSITE",  "Website"
+        MARKET   = "MARKET",   "Marketplace"
+        FACTORY  = "FACTORY",  "Factory / Wholesale"
+        DEPOT   = "DEPOT",    "Depot"
+        OTHER    = "OTHER",    "Other"
+
+    id = models.BigAutoField(primary_key=True)
+    name = models.CharField(max_length=120, unique=True)           # human name shown to staff
+    slug = models.SlugField(max_length=140, unique=True, blank=True)
+    kind = models.CharField(max_length=16, choices=Kind.choices, default=Kind.SHOWROOM, db_index=True)
+    is_active = models.BooleanField(default=True)
+    meta = models.JSONField(default=dict, blank=True)              # freeform: {platform, account, store, phone, etc.}
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            self.slug = slugify(self.name)
+        super().save(*args, **kwargs)
+
+    def __str__(self) -> str:
+        return self.name

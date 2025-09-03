@@ -3,13 +3,18 @@ from rest_framework import serializers
 from .models import (
     Customer, Product, Order, OrderLine,
     DeliveryNote, DeliveryLine,
-    Invoice, InvoiceLine, Payment
+    Invoice, InvoiceLine, Payment ,SalesPoint
 )
 
 from decimal import Decimal
 from django.db import transaction
 from django.utils import timezone
 from django.core.exceptions import ObjectDoesNotExist
+
+class SalesPointSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SalesPoint
+        fields = "__all__"
 
 class OrderLineWriteSerializer(serializers.ModelSerializer):
     class Meta:
@@ -37,7 +42,7 @@ class OrderWriteSerializer(serializers.ModelSerializer):
     class Meta:
         model = Order
         fields = (
-            "customer","currency","expected_delivery_date","notes","lines"
+            "customer","currency","expected_delivery_date","notes","sales_point","lines"
         )
 
     def validate_lines(self, lines):
@@ -112,6 +117,7 @@ class OrderLineSerializer(serializers.ModelSerializer):
 class OrderSerializer(serializers.ModelSerializer):
     lines = OrderLineSerializer(many=True, read_only=True)
     customer_detail = CustomerSerializer(source="customer", read_only=True)
+    sales_point_detail = SalesPointSerializer(source="sales_point", read_only=True)
 
     class Meta:
         model = Order

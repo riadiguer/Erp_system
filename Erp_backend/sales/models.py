@@ -470,3 +470,115 @@ class SalesPoint(models.Model):
 
     def __str__(self) -> str:
         return self.name
+
+
+# ---------- Devis ----------
+class Quote(models.Model):
+    class Status(models.TextChoices):
+        DRAFT    = "DRAFT", "Draft"
+        SENT     = "SENT", "Sent"
+        ACCEPTED = "ACCEPTED", "Accepted"
+        REJECTED = "REJECTED", "Rejected"
+        EXPIRED  = "EXPIRED", "Expired"
+
+    id = models.UUIDField(primary_key=True,  default=uuid.uuid4 , editable=False)
+    code = models.CharField(max_length=20, unique=True, editable=False)  # QTE000001
+    seq = models.IntegerField(default=0, editable=False)
+
+    customer = models.ForeignKey("sales.Customer", on_delete=models.PROTECT, related_name="quotes")
+    sales_point = models.ForeignKey("sales.SalesPoint", on_delete=models.PROTECT, related_name="quotes", null=True, blank=True)
+
+    status = models.CharField(max_length=12, choices=Status.choices, default=Status.DRAFT, db_index=True)
+    currency = models.CharField(max_length=8, default="DZD")
+    valid_until = models.DateField(blank=True, null=True)  # validity period
+    notes = models.TextField(blank=True)
+
+    subtotal = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0.00"))
+    tax_amount = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0.00"))
+    total = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0.00"))
+
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    sent_at = models.DateTimeField(blank=True, null=True)
+    decided_at = models.DateTimeField(blank=True, null=True)  # when accepted/rejected
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [models.Index(fields=["status", "created_at"])]
+
+    def save(self, *args, **kwargs):
+        if not self.code:
+            last_seq = Quote.objects.aggregate(m=models.Max("seq"))["m"] or 0
+            code, n = next_code("QTE", last_seq)
+            self.code, self.seq = code, n
+        super().save(*args, **kwargs)
+
+    def recompute_totals(self, save=True):
+        sub = tax = Decimal("0.00")
+        for line in self.lines.all():
+            sub += money(line.subtotal)
+            tax += money(line.tax_amount)
+        self.subtotal = money(sub)
+        self.tax_amount = money(tax)
+        self.total = money(sub + tax)
+        if save:
+            super().save(update_fields=["subtotal", "tax_amount", "total", "updated_at"])
+
+    def mark_sent(self):
+        if self.status == self.Status.DRAFT:
+            self.status = self.Status.SENT
+            self.sent_at = timezone.now()
+            self.save(update_fields=["status", "sent_at", "updated_at"])
+
+    def accept(self):
+        if self.status not in (self.Status.SENT,):
+            raise ValueError("Only sent quotes can be accepted.")
+        self.status = self.Status.ACCEPTED
+        self.decided_at = timezone.now()
+        self.save(update_fields=["status", "decided_at", "updated_at"])
+
+    def reject(self):
+        if self.status not in (self.Status.SENT,):
+            raise ValueError("Only sent quotes can be rejected.")
+        self.status = self.Status.REJECTED
+        self.decided_at = timezone.now()
+        self.save(update_fields=["status", "decided_at", "updated_at"])
+
+    def expire(self):
+        self.status = self.Status.EXPIRED
+        self.save(update_fields=["status", "updated_at"])
+
+
+class QuoteLine(models.Model):
+    quote = models.ForeignKey(Quote, on_delete=models.CASCADE, related_name="lines")
+    product = models.ForeignKey("sales.Product", on_delete=models.PROTECT, related_name="quote_lines")
+    description = models.CharField(max_length=255, blank=True)
+
+    quantity = models.DecimalField(max_digits=14, decimal_places=3)
+    unit_price = models.DecimalField(max_digits=12, decimal_places=2)  # sourced from Product
+    tax_rate = models.DecimalField(max_digits=5, decimal_places=2)     # sourced from Product
+
+    subtotal = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0.00"))
+    tax_amount = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0.00"))
+    total = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0.00"))
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(check=models.Q(quantity__gt=0), name="quoteline_qty_gt_0"),
+        ]
+
+    def compute_amounts(self):
+        sub = money(self.quantity * self.unit_price)
+        tax = money(sub * (self.tax_rate / Decimal("100")))
+        self.subtotal = sub
+        self.tax_amount = tax
+        self.total = money(sub + tax)
+
+    def save(self, *args, **kwargs):
+        if self.tax_rate is None:
+            self.tax_rate = self.product.tax_rate
+        if self.unit_price is None:
+            self.unit_price = self.product.unit_price
+        self.compute_amounts()
+        super().save(*args, **kwargs)
+        self.quote.recompute_totals(save=True)

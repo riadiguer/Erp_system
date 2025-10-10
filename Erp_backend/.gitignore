@@ -1,5 +1,34 @@
-# Ignore SQLite database
-*.sqlite3
-# Ignore Python cache files
+# Byte-compiled / cache
 __pycache__/
-*.pyc
+*.py[cod]
+*.pyo
+
+# Virtual envs
+.venv/
+venv/
+env/
+
+# Editors / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Logs / coverage / pytest
+*.log
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Django
+db.sqlite3
+*.sqlite3
+/media/
+staticfiles/
+# Keep migrations tracked (recommended). If you really want to ignore, uncomment:
+# */migrations/*.py
+# !*/migrations/__init__.py
+
+# Environment files
+.env
+.env.*

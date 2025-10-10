@@ -5,6 +5,7 @@ from .views import (
     OrderViewSet, DeliveryNoteViewSet,
     InvoiceViewSet, PaymentViewSet,
     SalesPointViewSet,
+    QuoteViewSet
 )
 
 router = DefaultRouter()
@@ -15,6 +16,8 @@ router.register("delivery-notes", DeliveryNoteViewSet, basename="deliverynote")
 router.register("invoices", InvoiceViewSet, basename="invoice")
 router.register("payments", PaymentViewSet, basename="payment")
 router.register("sales-points", SalesPointViewSet, basename="salespoint")
+router.register("quotes", QuoteViewSet, basename="quote")
+
 # keep your existing routes (orders/products/...)
 
 

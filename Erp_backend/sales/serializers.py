@@ -3,7 +3,7 @@ from rest_framework import serializers
 from .models import (
     Customer, Product, Order, OrderLine,
     DeliveryNote, DeliveryLine,
-    Invoice, InvoiceLine, Payment ,SalesPoint
+    Invoice, InvoiceLine, Payment ,SalesPoint ,Quote, QuoteLine
 )
 
 from decimal import Decimal
@@ -124,67 +124,155 @@ class OrderSerializer(serializers.ModelSerializer):
         fields = "__all__"
         read_only_fields = ("code", "seq", "subtotal", "tax_amount", "total", "status")
 
-class DeliveryLineSerializer(serializers.ModelSerializer):
+class ProductLiteSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Product
+        fields = ("id", "sku", "name")
+
+class OrderLineLiteSerializer(serializers.ModelSerializer):
+    product_detail = ProductLiteSerializer(source="product", read_only=True)
+
+    class Meta:
+        model = OrderLine
+        fields = (
+            "id",
+            "product", "product_detail",
+            "description",
+            "quantity",
+            "delivered_qty",
+        )
+
+class CustomerLiteSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Customer
+        fields = ("id", "name", "email", "phone")
+
+class OrderLiteSerializer(serializers.ModelSerializer):
+    customer_detail = CustomerLiteSerializer(source="customer", read_only=True)
+    lines = OrderLineLiteSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Order
+        fields = ("id", "code", "customer", "customer_detail", "currency", "lines")
+
+
+# =========================
+# Delivery Notes (READ)
+# =========================
+
+class DeliveryLineReadSerializer(serializers.ModelSerializer):
+    # Include rich details for the referenced order line (with product detail)
+    order_line_detail = OrderLineLiteSerializer(source="order_line", read_only=True)
+
     class Meta:
         model = DeliveryLine
         fields = "__all__"
 
 class DeliveryNoteSerializer(serializers.ModelSerializer):
-    lines = DeliveryLineSerializer(many=True, read_only=True)
+    lines = DeliveryLineReadSerializer(many=True, read_only=True)
+    order_detail = OrderLiteSerializer(source="order", read_only=True)
 
     class Meta:
         model = DeliveryNote
         fields = "__all__"
         read_only_fields = ("code", "seq", "status", "delivered_at")
 
-class DeliveryLineWriteSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = DeliveryLine
-        fields = ("order_line", "quantity")
 
-    def validate(self, attrs):
-        ol = attrs["order_line"]
-        if attrs["quantity"] <= 0:
-            raise serializers.ValidationError("Delivery quantity must be > 0.")
-        remaining = (ol.quantity - ol.delivered_qty)
-        if attrs["quantity"] > remaining:
-            raise serializers.ValidationError("Delivered quantity exceeds remaining to deliver.")
-        # Stock check
-        p = ol.product
-        if p.track_stock and p.type == Product.ProductType.GOOD:
-            if p.stock_qty < attrs["quantity"]:
-                raise serializers.ValidationError(f"Insufficient stock for {p.sku}.")
-        return attrs
+# =========================
+# Delivery Notes (WRITE)
+# =========================
+
+class DeliveryNoteLineInputSerializer(serializers.Serializer):
+    order_line = serializers.UUIDField()
+    quantity = serializers.DecimalField(max_digits=14, decimal_places=3)
+
+    def validate_quantity(self, v: Decimal):
+        if v is None or v <= 0:
+            raise serializers.ValidationError("Quantity must be > 0.")
+        return v
 
 class DeliveryNoteWriteSerializer(serializers.ModelSerializer):
-    lines = DeliveryLineWriteSerializer(many=True)
+    """
+    Accepts:
+    {
+      "order": "<order_uuid>",
+      "notes": "...",
+      "lines": [
+        {"order_line": "<order_line_uuid>", "quantity": 2.5},
+        ...
+      ]
+    }
+    """
+    lines = DeliveryNoteLineInputSerializer(many=True, write_only=True)
 
     class Meta:
         model = DeliveryNote
         fields = ("order", "notes", "lines")
 
     def validate(self, attrs):
-        order = attrs["order"]
-        if order.status not in (Order.Status.CONFIRMED, Order.Status.PARTIALLY_DELIVERED):
-            raise serializers.ValidationError("Order must be confirmed to deliver.")
-        # Make sure every line belongs to this order
-        lines = self.initial_data.get("lines", [])
-        if not lines:
-            raise serializers.ValidationError("At least one delivery line is required.")
-        # We can only validate cross-line/order relationship using initial_data ids here
-        ol_ids = {ln["order_line"] for ln in lines}
-        count = OrderLine.objects.filter(order=order, id__in=ol_ids).count()
-        if count != len(ol_ids):
-            raise serializers.ValidationError("All delivery lines must reference order lines of the given order.")
+        order = attrs.get("order")
+        lines = attrs.get("lines") or []
+
+        if not order:
+            raise serializers.ValidationError({"order": "This field is required."})
+        if not isinstance(lines, list) or len(lines) == 0:
+            raise serializers.ValidationError({"lines": "Provide at least one line."})
+
+        # For updates, ensure we're still in DRAFT status
+        if self.instance and self.instance.status != DeliveryNote.Status.DRAFT:
+            raise serializers.ValidationError("Only draft delivery notes can be modified.")
+
+        # Sanity: ensure all order_line IDs belong to the same order
+        ol_ids = [str(item["order_line"]) for item in lines if "order_line" in item]
+        linked = set(
+            OrderLine.objects.filter(order=order, id__in=ol_ids).values_list("id", flat=True)
+        )
+        missing = [ol for ol in ol_ids if ol not in linked]
+        if missing:
+            raise serializers.ValidationError(
+                {"lines": f"Some order lines do not belong to order {order.code}: {missing}"}
+            )
+
         return attrs
 
     @transaction.atomic
     def create(self, validated_data):
-        lines = validated_data.pop("lines", [])
-        dn = DeliveryNote.objects.create(**validated_data)
-        for ln in lines:
-            DeliveryLine.objects.create(delivery=dn, **ln)
+        lines_data = validated_data.pop("lines", [])
+        dn: DeliveryNote = DeliveryNote.objects.create(**validated_data)
+
+        # Create DeliveryLine entries; rely on model.clean() for business rules:
+        # - qty > 0
+        # - not exceeding remaining qty
+        for item in lines_data:
+            ol = OrderLine.objects.get(id=item["order_line"])
+            dl = DeliveryLine(delivery=dn, order_line=ol, quantity=item["quantity"])
+            dl.full_clean()   # triggers model-level checks
+            dl.save()
+
         return dn
+
+    @transaction.atomic
+    def update(self, instance, validated_data):
+        lines_data = validated_data.pop("lines", None)
+        
+        # Update basic fields
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+
+        # If lines are provided, replace all existing lines
+        if lines_data is not None:
+            # Delete existing lines
+            instance.lines.all().delete()
+            
+            # Create new lines
+            for item in lines_data:
+                ol = OrderLine.objects.get(id=item["order_line"])
+                dl = DeliveryLine(delivery=instance, order_line=ol, quantity=item["quantity"])
+                dl.full_clean()   # triggers model-level checks
+                dl.save()
+
+        return instance
 
 class InvoiceLineSerializer(serializers.ModelSerializer):
     class Meta:
@@ -286,3 +374,48 @@ class PaymentSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Payment exceeds invoice balance due.")
         return attrs
 
+# ---------- Devis ----------
+class QuoteLineWriteSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = QuoteLine
+        fields = ("product", "description", "quantity")  # unit_price/tax_rate come from Product
+
+class QuoteWriteSerializer(serializers.ModelSerializer):
+    lines = QuoteLineWriteSerializer(many=True)
+
+    class Meta:
+        model = Quote
+        fields = ("customer","sales_point","currency","valid_until","notes","lines")
+
+    @transaction.atomic
+    def create(self, data):
+        lines = data.pop("lines", [])
+        quote = Quote.objects.create(**data)
+        for ln in lines:
+            product = ln["product"] if isinstance(ln["product"], Product) else Product.objects.get(pk=ln["product"])
+            QuoteLine.objects.create(
+                quote=quote,
+                product=product,
+                description=ln.get("description",""),
+                quantity=ln["quantity"],
+                unit_price=product.unit_price,
+                tax_rate=product.tax_rate,
+            )
+        quote.recompute_totals(save=True)
+        return quote
+
+class QuoteLineSerializer(serializers.ModelSerializer):
+    product_detail = ProductSerializer(source="product", read_only=True)
+    class Meta:
+        model = QuoteLine
+        fields = "__all__"
+
+class QuoteSerializer(serializers.ModelSerializer):
+    lines = QuoteLineSerializer(many=True, read_only=True)
+    customer_detail = CustomerSerializer(source="customer", read_only=True)
+    sales_point_detail = SalesPointSerializer(source="sales_point", read_only=True)
+
+    class Meta:
+        model = Quote
+        fields = "__all__"
+        read_only_fields = ("code","seq","subtotal","tax_amount","total","status","sent_at","decided_at")

@@ -521,7 +521,7 @@ export default function OrdersPage() {
             <div key={o.id} className="bg-white rounded-2xl shadow-sm border border-gray-200 hover:shadow-lg transition-all duration-200 group">
               <div className="p-6">
                 <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-4">
-                  <div className="flex items-center gap-4" onClick={() => router.push(`/sales/orders/${o.id}`)} className="cursor-pointer">
+                  <div className="flex items-center gap-4 cursor-pointer" onClick={() => router.push(`/sales/orders/${o.id}`)}>
                     <div className="bg-gradient-to-r from-blue-100 to-indigo-100 rounded-xl p-3 group-hover:from-blue-200 group-hover:to-indigo-200 transition-colors">
                       <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />

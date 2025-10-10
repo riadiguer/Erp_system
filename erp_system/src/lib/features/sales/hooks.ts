@@ -1,5 +1,5 @@
 import useSWR from 'swr';
-import { SalesApi, type Order, type Invoice, type Customer, type Product, SalesPoint } from './api';
+import { SalesApi, type Order, type Invoice, type Customer, type Product, type Quote , type DeliveryNote ,SalesPoint, OrderLite } from './api';
 
 export function useOrders() {
   const { data, error, mutate, isValidating } = useSWR<Order[]>('/sales/orders/', SalesApi.orders.list);
@@ -33,6 +33,12 @@ export function useDeliveryNotesByOrder(orderId?: string) {
   return { deliveryNotes: data || [], loading: !!orderId && !data && !error, error, refresh: mutate };
 }
 
+export function useDeliveryNotes() {
+  const { data, error, mutate, isValidating } = useSWR<DeliveryNote[]>('/sales/delivery-notes/', SalesApi.deliveryNotes.list);
+  return { notes: data || [], loading: !data && !error, error, refresh: mutate, isValidating };
+}
+
+
 export function useInvoicesByOrder(orderId?: string) {
   const key = orderId ? `/sales/invoices/?order=${orderId}` : null;
   const { data, error, mutate } = useSWR<Invoice[]>(key, () => SalesApi.invoices.listByOrder(orderId!));
@@ -44,3 +50,18 @@ export function useSalesPoints() {
   return { salesPoints: data || [], loading: !data && !error, error, refresh: mutate };
 }
 
+export function useQuotes() {
+  const { data, error, mutate, isValidating } = useSWR<Quote[]>('/sales/quotes/', SalesApi.quotes.list);
+  return { quotes: data || [], loading: !data && !error, error, refresh: mutate, isValidating };
+}
+
+export function useQuote(id?: string) {
+  const key = id ? `/sales/quotes/${id}/` : null;
+  const { data, error, mutate, isValidating } = useSWR<Quote>(key, () => SalesApi.quotes.get(id!));
+  return { quote: data, loading: !!id && !data && !error, error, refresh: mutate, isValidating };
+}
+
+export function useOrdersLite() {
+  const { data, error } = useSWR<OrderLite[]>('/sales/orders/', SalesApi.orders.list);
+  return { orders: data, loading: !data && !error, error };
+}

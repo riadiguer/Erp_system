@@ -475,7 +475,7 @@ export default function SalesPointsPage() {
                                 type="text"
                                 value={editName}
                                 onChange={e => setEditName(e.target.value)}
-                                onKeyPress={e => handleEditKeyPress(e, sp.id)}
+                                onKeyPress={e => handleEditKeyPress(e, String(sp.id))}
                                 className="w-full px-3 py-2 text-lg font-semibold border border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:ring-opacity-20 transition-colors"
                                 placeholder="Sales point name"
                               />
@@ -571,7 +571,7 @@ export default function SalesPointsPage() {
                         {isEditing ? (
                           <div className="flex items-center space-x-2">
                             <button
-                              onClick={() => saveEdit(sp.id)}
+                              onClick={() => saveEdit(String(sp.id))}
                               disabled={!editName.trim() || isUpdating}
                               className="flex items-center px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white text-sm font-medium rounded-lg transition-colors disabled:cursor-not-allowed shadow-sm"
                             >
@@ -606,7 +606,7 @@ export default function SalesPointsPage() {
                             </button>
                             
                             <button
-                              onClick={() => toggleActive(sp.id, sp.is_active)}
+                              onClick={() => toggleActive(String(sp.id), sp.is_active)}
                               disabled={isUpdating}
                               className={`flex items-center px-3 py-2 rounded-lg transition-colors disabled:opacity-50 text-sm font-medium ${
                                 sp.is_active 
@@ -635,7 +635,7 @@ export default function SalesPointsPage() {
                             </button>
                             
                             <button
-                              onClick={() => deleteSalesPoint(sp.id, sp.name)}
+                              onClick={() => deleteSalesPoint(String(sp.id), sp.name)}
                               disabled={deletingId === sp.id}
                               className="flex items-center px-3 py-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50 text-sm font-medium"
                               title="Delete sales point"

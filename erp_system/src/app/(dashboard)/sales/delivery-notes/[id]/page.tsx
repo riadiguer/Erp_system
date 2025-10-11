@@ -5,8 +5,9 @@ import { useParams } from 'next/navigation';
 import useSWR from 'swr';
 import { useMemo, useState } from 'react';
 import { PermissionGate } from '@/components/guards/PermissionGate';
+import { SalesApi } from '@/lib/features/sales/api';
 
-// --- types (same as list page) ----------------------------------------------
+// --- types ----------------------------------------------
 type DeliveryNoteStatus = 'DRAFT'|'SENT'|'DELIVERED'|'CANCELLED';
 type ProductLite = { id: string; sku: string; name: string };
 type OrderLineLite = {
@@ -24,7 +25,12 @@ type OrderLite = {
   currency: string;
   lines: OrderLineLite[];
 };
-type DeliveryLine = { id: string; order_line: string; quantity: string; order_line_detail?: OrderLineLite };
+type DeliveryLine = { 
+  id: string; 
+  order_line: string; 
+  quantity: string; 
+  order_line_detail?: OrderLineLite 
+};
 type DeliveryNote = {
   id: string;
   code: string;
@@ -36,51 +42,25 @@ type DeliveryNote = {
   lines: DeliveryLine[];
 };
 
-const api = {
-  get: async <T,>(url: string) => {
-    const r = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api${url}`, { credentials: 'include' });
-    if (!r.ok) {
-      const detail = await r.json().catch(() => ({}));
-      const err: any = new Error('REQ_FAILED'); err.status = r.status; err.detail = (detail as any)?.detail; throw err;
-    }
-    return r.json() as Promise<T>;
-  },
-  post: async <T,>(url: string, body?: any) => {
-    const r = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api${url}`, {
-      method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
-      body: body ? JSON.stringify(body) : undefined
-    });
-    if (!r.ok) {
-      const detail = await r.json().catch(() => ({}));
-      const err: any = new Error('REQ_FAILED'); err.status = r.status; err.detail = (detail as any)?.detail; throw err;
-    }
-    return r.json() as Promise<T>;
-  },
-};
-
-const SalesApi = {
-  deliveryNotes: {
-    get: (id: string) => api.get<DeliveryNote>(`/sales/delivery-notes/${id}/`),
-    addLines: (id: string, lines: { order_line: string; quantity: number }[]) =>
-      api.post<DeliveryNote>(`/sales/delivery-notes/${id}/lines/`, { lines }),
-    markDelivered: (id: string) => api.post<{ ok: true }>(`/sales/delivery-notes/${id}/mark_delivered/`),
-  },
-};
-
 export default function DeliveryNoteDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const { data, error, mutate } = useSWR<DeliveryNote>(`/sales/delivery-notes/${id}/`, () => SalesApi.deliveryNotes.get(id));
-  const [rows, setRows] = useState<{ order_line: string; quantity: number }[]>([]);
+  const { data, error, mutate } = useSWR<DeliveryNote>(
+    `/sales/delivery-notes/${id}/`, 
+    () => SalesApi.deliveryNotes.get(id)
+  );
+  
+  const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [errMsg, setErrMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
 
+  // Calculate remaining quantities accounting for what's already in this note
   const remainingByLine = useMemo(() => {
     const map: Record<string, number> = {};
     if (data?.order_detail?.lines) {
       data.order_detail.lines.forEach(l => {
         const already = Number(l.delivered_qty);
         const ordered = Number(l.quantity);
-        // subtract what's already inside this draft delivery note too
+        // Subtract what's already in this draft delivery note
         const inThisNote = (data.lines || [])
           .filter(dl => dl.order_line === l.id)
           .reduce((sum, dl) => sum + Number(dl.quantity), 0);
@@ -90,9 +70,37 @@ export default function DeliveryNoteDetailPage() {
     return map;
   }, [data]);
 
+  // Get available lines (those with remaining quantity)
+  const availableLines = useMemo(() => {
+    if (!data?.order_detail?.lines) return [];
+    return data.order_detail.lines.filter(l => remainingByLine[l.id] > 0);
+  }, [data, remainingByLine]);
+
+  function toggleLine(lineId: string) {
+    setQuantities(prev => {
+      const copy = { ...prev };
+      if (lineId in copy) {
+        delete copy[lineId];
+      } else {
+        const max = remainingByLine[lineId] || 0;
+        copy[lineId] = Math.min(1, max);
+      }
+      return copy;
+    });
+  }
+
+  function updateQuantity(lineId: string, value: number) {
+    const max = remainingByLine[lineId] || 0;
+    setQuantities(prev => ({
+      ...prev,
+      [lineId]: Math.min(Math.max(0, value), max)
+    }));
+  }
+
   async function doMarkDelivered() {
     if (!data) return;
-    setBusy('deliver'); setErrMsg(null);
+    setBusy('deliver'); 
+    setErrMsg(null);
     try {
       await SalesApi.deliveryNotes.markDelivered(data.id);
       await mutate();
@@ -104,11 +112,25 @@ export default function DeliveryNoteDetailPage() {
   }
 
   async function addLines() {
-    if (!data || rows.length === 0) return;
-    setBusy('add'); setErrMsg(null);
+    if (!data || Object.keys(quantities).length === 0) return;
+    
+    const lines = Object.entries(quantities)
+      .filter(([_, qty]) => qty > 0)
+      .map(([lineId, qty]) => ({ 
+        order_line: lineId, 
+        quantity: qty 
+      }));
+
+    if (lines.length === 0) {
+      setErrMsg('Please select at least one line with quantity > 0');
+      return;
+    }
+
+    setBusy('add'); 
+    setErrMsg(null);
     try {
-      await SalesApi.deliveryNotes.addLines(data.id, rows.map(r => ({ order_line: r.order_line, quantity: Number(r.quantity) })));
-      setRows([]);
+      await SalesApi.deliveryNotes.addLines(data.id, lines);
+      setQuantities({});
       await mutate();
     } catch (e: any) {
       setErrMsg(e?.detail || 'Failed to add lines.');
@@ -117,10 +139,33 @@ export default function DeliveryNoteDetailPage() {
     }
   }
 
-  if (error) return <div className="p-6 text-red-600">Failed to load delivery note.</div>;
-  if (!data) return <div className="p-6">Loading…</div>;
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-6">
+        <div className="max-w-6xl mx-auto">
+          <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-red-800">
+            Failed to load delivery note: {error.message || error}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!data) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-6">
+        <div className="max-w-6xl mx-auto">
+          <div className="rounded-2xl border bg-white p-12 text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto" />
+            <div className="mt-3 text-gray-600">Loading…</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const canEdit = data.status === 'DRAFT';
+  const selectedLines = Object.keys(quantities).filter(id => quantities[id] > 0);
 
   const badge =
     data.status === 'DRAFT' ? 'bg-yellow-100 text-yellow-800 border-yellow-200' :
@@ -133,140 +178,267 @@ export default function DeliveryNoteDetailPage() {
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-6">
       <div className="max-w-6xl mx-auto space-y-8">
         <div className="flex items-center justify-between">
-          <Link href="/sales/delivery-notes" className="text-sm text-blue-600 hover:underline">← Back to Delivery Notes</Link>
+          <Link 
+            href="/sales/delivery-notes" 
+            className="inline-flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700 font-medium"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            Back to Delivery Notes
+          </Link>
         </div>
 
+        {/* Header Card */}
         <div className="bg-white rounded-2xl border shadow-sm p-6">
           <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-6">
-            <div>
-              <h1 className="text-2xl font-bold">{data.code}</h1>
-              <div className="text-gray-700">{data.order_detail?.code} — {data.order_detail?.customer_detail?.name}</div>
-              <div className="mt-1 flex gap-2 items-center">
-                <span className={`px-3 py-1 rounded-full border text-xs font-semibold ${badge}`}>{data.status}</span>
-                <span className="text-xs text-gray-500">Created {new Date(data.created_at).toLocaleString()}</span>
-                {data.delivered_at && <span className="text-xs text-gray-500">· Delivered {new Date(data.delivered_at).toLocaleString()}</span>}
+            <div className="flex-1">
+              <div className="flex items-center gap-3 mb-2">
+                <h1 className="text-3xl font-bold text-gray-900">{data.code}</h1>
+                <span className={`px-3 py-1 rounded-full border text-xs font-semibold ${badge}`}>
+                  {data.status}
+                </span>
+              </div>
+              
+              <div className="space-y-1 text-gray-700">
+                <div className="flex items-center gap-2">
+                  <span className="font-medium">Order:</span>
+                  <Link 
+                    href={`/sales/orders/${data.order}`}
+                    className="text-blue-600 hover:underline"
+                  >
+                    {data.order_detail?.code}
+                  </Link>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="font-medium">Customer:</span>
+                  <span>{data.order_detail?.customer_detail?.name || 'Unknown'}</span>
+                </div>
+              </div>
+
+              <div className="mt-3 flex flex-wrap gap-3 text-sm text-gray-500">
+                <div className="flex items-center gap-1">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  Created: {new Date(data.created_at).toLocaleString()}
+                </div>
+                {data.delivered_at && (
+                  <div className="flex items-center gap-1 text-green-600">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    Delivered: {new Date(data.delivered_at).toLocaleString()}
+                  </div>
+                )}
               </div>
             </div>
 
             <PermissionGate need="sales_manage">
-              {canEdit && (
+              {canEdit && data.lines.length > 0 && (
                 <button
                   onClick={doMarkDelivered}
                   disabled={busy === 'deliver'}
-                  className="rounded-xl bg-black text-white px-5 py-2.5 disabled:opacity-50"
+                  className="inline-flex items-center gap-2 rounded-xl bg-green-600 text-white px-5 py-3 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
-                  {busy === 'deliver' ? 'Marking…' : 'Mark delivered'}
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  {busy === 'deliver' ? 'Marking…' : 'Mark as Delivered'}
                 </button>
               )}
             </PermissionGate>
           </div>
 
-          {errMsg && <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-red-800">{errMsg}</div>}
+          {errMsg && (
+            <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-red-800">
+              <strong>Error:</strong> {errMsg}
+            </div>
+          )}
         </div>
 
-        {/* Lines table */}
-        <section className="rounded-2xl border bg-white overflow-hidden">
-          <div className="border-b p-4 font-semibold">Lines</div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-3 py-2 text-left">Product</th>
-                  <th className="px-3 py-2 text-left">Description</th>
-                  <th className="px-3 py-2 text-right">Qty (this note)</th>
-                  <th className="px-3 py-2 text-right">Ordered</th>
-                  <th className="px-3 py-2 text-right">Delivered so far</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.lines.map(dl => {
-                  const ol = data.order_detail?.lines.find(l => l.id === dl.order_line);
-                  return (
-                    <tr key={dl.id} className="border-t">
-                      <td className="px-3 py-2">{ol?.product_detail?.sku} — {ol?.product_detail?.name}</td>
-                      <td className="px-3 py-2">{ol?.description || '—'}</td>
-                      <td className="px-3 py-2 text-right">{dl.quantity}</td>
-                      <td className="px-3 py-2 text-right">{ol?.quantity}</td>
-                      <td className="px-3 py-2 text-right">{ol?.delivered_qty}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+        {/* Current Lines */}
+        <section className="rounded-2xl border bg-white overflow-hidden shadow-sm">
+          <div className="border-b bg-gray-50 px-6 py-4">
+            <h2 className="text-lg font-semibold text-gray-900">
+              Items in this Delivery ({data.lines.length})
+            </h2>
           </div>
+          
+          {data.lines.length === 0 ? (
+            <div className="p-12 text-center text-gray-500">
+              <svg className="w-16 h-16 mx-auto mb-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+              </svg>
+              <p className="font-medium">No items in this delivery note yet</p>
+              {canEdit && <p className="text-sm mt-1">Add items from the order below</p>}
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-sm">
+                <thead className="bg-gray-50 border-b">
+                  <tr>
+                    <th className="px-6 py-3 text-left font-semibold text-gray-700">Product</th>
+                    <th className="px-6 py-3 text-left font-semibold text-gray-700">Description</th>
+                    <th className="px-6 py-3 text-right font-semibold text-gray-700">Qty (this note)</th>
+                    <th className="px-6 py-3 text-right font-semibold text-gray-700">Ordered</th>
+                    <th className="px-6 py-3 text-right font-semibold text-gray-700">Total Delivered</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {data.lines.map(dl => {
+                    const ol = data.order_detail?.lines.find(l => l.id === dl.order_line);
+                    return (
+                      <tr key={dl.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4">
+                          <div className="font-medium text-gray-900">
+                            {ol?.product_detail?.sku || 'Unknown'}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {ol?.product_detail?.name || 'Unknown Product'}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-gray-600">
+                          {ol?.description || '—'}
+                        </td>
+                        <td className="px-6 py-4 text-right font-semibold text-gray-900">
+                          {dl.quantity}
+                        </td>
+                        <td className="px-6 py-4 text-right text-gray-600">
+                          {ol?.quantity || '—'}
+                        </td>
+                        <td className="px-6 py-4 text-right text-gray-600">
+                          {ol?.delivered_qty || '0'}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </section>
 
-        {/* Add more lines (only DRAFT) */}
-        {canEdit && (
-          <section className="rounded-2xl border bg-white p-6 space-y-4">
-            <div className="font-semibold">Add lines</div>
+        {/* Add More Lines (DRAFT only) */}
+        {canEdit && availableLines.length > 0 && (
+          <section className="rounded-2xl border bg-white shadow-sm overflow-hidden">
+            <div className="border-b bg-gray-50 px-6 py-4">
+              <h2 className="text-lg font-semibold text-gray-900">
+                Add More Items from Order
+              </h2>
+              <p className="text-sm text-gray-600 mt-1">
+                Select additional items to include in this delivery
+              </p>
+            </div>
 
-            <div className="grid gap-3">
-              <div className="grid grid-cols-1 md:grid-cols-6 gap-3 items-end">
-                <div className="md:col-span-4">
-                  <label className="text-xs text-gray-600">Order line</label>
-                  <select
-                    className="w-full rounded-lg border px-3 py-2.5"
-                    onChange={(e) => {
-                      const id = e.target.value;
-                      if (!id) return;
-                      const max = remainingByLine[id] || 0;
-                      if (max <= 0) return;
-                      setRows(prev => prev.some(r => r.order_line === id) ? prev : [...prev, { order_line: id, quantity: Math.min(1, max) }]);
-                      e.currentTarget.selectedIndex = 0;
-                    }}
-                  >
-                    <option value="">Pick order line…</option>
-                    {(data.order_detail?.lines || []).map(ol => {
-                      const rem = remainingByLine[ol.id] || 0;
-                      return (
-                        <option key={ol.id} value={ol.id} disabled={rem <= 0}>
-                          {ol.product_detail?.sku} — {ol.product_detail?.name} (remain {rem})
-                        </option>
-                      );
-                    })}
-                  </select>
-                </div>
+            <div className="p-6 space-y-4">
+              <div className="space-y-3">
+                {availableLines.map(line => {
+                  const remaining = remainingByLine[line.id] || 0;
+                  const isSelected = line.id in quantities;
+                  const currentQty = quantities[line.id] || 0;
+
+                  return (
+                    <div 
+                      key={line.id}
+                      className={`border rounded-xl p-4 transition-all ${
+                        isSelected 
+                          ? 'border-blue-500 bg-blue-50' 
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <div className="flex items-start gap-4">
+                        <div className="flex items-center pt-1">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => toggleLine(line.id)}
+                            className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                        
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-4">
+                            <div>
+                              <div className="font-semibold text-gray-900">
+                                {line.product_detail?.sku || 'Unknown SKU'}
+                              </div>
+                              <div className="text-sm text-gray-600 mt-0.5">
+                                {line.product_detail?.name || 'Unknown Product'}
+                              </div>
+                              {line.description && (
+                                <div className="text-xs text-gray-500 mt-1">
+                                  {line.description}
+                                </div>
+                              )}
+                            </div>
+                            
+                            <div className="text-right flex-shrink-0">
+                              <div className="text-sm text-amber-600">Available</div>
+                              <div className="font-bold text-amber-700">{remaining}</div>
+                            </div>
+                          </div>
+
+                          {isSelected && (
+                            <div className="mt-3 flex items-center gap-3">
+                              <label className="text-sm font-medium text-gray-700 min-w-[120px]">
+                                Quantity to deliver:
+                              </label>
+                              <input
+                                type="number"
+                                min={0}
+                                max={remaining}
+                                step="0.001"
+                                value={currentQty}
+                                onChange={(e) => updateQuantity(line.id, Number(e.target.value))}
+                                className="w-32 rounded-lg border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                              />
+                              <span className="text-sm text-gray-500">
+                                (max: {remaining})
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
 
-              {rows.map((r, i) => {
-                const ol = data.order_detail?.lines.find(l => l.id === r.order_line);
-                const max = remainingByLine[r.order_line] || 0;
-                return (
-                  <div key={i} className="grid grid-cols-1 md:grid-cols-6 gap-3 items-center border rounded-xl p-3">
-                    <div className="md:col-span-4">
-                      <div className="font-medium">{ol?.product_detail?.sku} — {ol?.product_detail?.name}</div>
-                      <div className="text-xs text-gray-500">Remain: {max}</div>
+              {selectedLines.length > 0 && (
+                <div className="border-t pt-4">
+                  <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-4">
+                    <div className="flex items-center gap-2 text-blue-900">
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <span className="font-semibold">
+                        {selectedLines.length} item{selectedLines.length !== 1 ? 's' : ''} selected
+                      </span>
                     </div>
-                    <div>
-                      <label className="text-xs text-gray-600">Qty</label>
-                      <input
-                        type="number" min={0} step="0.001"
-                        className="w-full rounded-lg border px-3 py-2.5"
-                        value={r.quantity}
-                        onChange={(e) => setRows(prev => {
-                          const copy = [...prev]; copy[i] = { ...copy[i], quantity: Math.min(Number(e.target.value || 0), max) }; return copy;
-                        })}
-                      />
-                    </div>
-                    <button className="text-red-600 hover:text-red-700 text-sm font-semibold" onClick={() => setRows(prev => prev.filter((_, idx) => idx !== i))}>
-                      Remove
-                    </button>
                   </div>
-                );
-              })}
 
-              <div className="flex gap-3">
-                <button
-                  className="rounded-xl bg-black text-white px-5 py-2.5 disabled:opacity-50"
-                  disabled={rows.length === 0 || busy === 'add'}
-                  onClick={addLines}
-                >
-                  {busy === 'add' ? 'Adding…' : 'Add to note'}
-                </button>
-              </div>
+                  <button
+                    className="w-full md:w-auto rounded-xl bg-black text-white px-6 py-3 hover:bg-neutral-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    disabled={selectedLines.length === 0 || busy === 'add'}
+                    onClick={addLines}
+                  >
+                    {busy === 'add' ? 'Adding…' : `Add ${selectedLines.length} Item${selectedLines.length !== 1 ? 's' : ''} to Delivery`}
+                  </button>
+                </div>
+              )}
             </div>
           </section>
+        )}
+
+        {canEdit && availableLines.length === 0 && data.lines.length > 0 && (
+          <div className="rounded-2xl border bg-white p-8 text-center text-gray-500">
+            <svg className="w-12 h-12 mx-auto mb-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <p className="font-medium">All order items included</p>
+            <p className="text-sm mt-1">No more items available to add from this order</p>
+          </div>
         )}
       </div>
     </div>

@@ -223,11 +223,17 @@ class DeliveryNoteWriteSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Only draft delivery notes can be modified.")
 
         # Sanity: ensure all order_line IDs belong to the same order
-        ol_ids = [str(item["order_line"]) for item in lines if "order_line" in item]
+        # Keep as UUID objects for proper comparison
+        from uuid import UUID
+        ol_ids = [item["order_line"] if isinstance(item["order_line"], UUID) else UUID(str(item["order_line"])) 
+                for item in lines if "order_line" in item]
+        
         linked = set(
             OrderLine.objects.filter(order=order, id__in=ol_ids).values_list("id", flat=True)
         )
-        missing = [ol for ol in ol_ids if ol not in linked]
+        
+        # Compare UUIDs directly
+        missing = [str(ol) for ol in ol_ids if ol not in linked]
         if missing:
             raise serializers.ValidationError(
                 {"lines": f"Some order lines do not belong to order {order.code}: {missing}"}

@@ -185,7 +185,7 @@ export default function UserDetailsModal({ open, onClose, user, onUpdate, allRol
                         <button
                           type="button"
                           className="p-1 rounded-full hover:bg-red-100 transition-colors group-hover:opacity-100 opacity-60"
-                          onClick={() => setForm(f => ({
+                          onClick={() => setForm((f: { roles: any[] }) => ({
                             ...f,
                             roles: f.roles.filter((_: string, i: number) => i !== index)
                           }))}
@@ -211,7 +211,7 @@ export default function UserDetailsModal({ open, onClose, user, onUpdate, allRol
                     onChange={e => {
                       const value = e.target.value
                       if (value && !(form.roles || []).includes(value)) {
-                        setForm(f => ({
+                        setForm((f: { roles: any }) => ({
                           ...f,
                           roles: [...(f.roles || []), value]
                         }))
@@ -243,7 +243,7 @@ export default function UserDetailsModal({ open, onClose, user, onUpdate, allRol
                         ? 'bg-green-500 text-white shadow-lg transform scale-105' 
                         : 'bg-white text-green-600 border-2 border-green-200 hover:bg-green-50 hover:border-green-300'
                     }`}
-                    onClick={() => setForm(f => ({ ...f, status: 'actif' }))}
+                    onClick={() => setForm((f: any) => ({ ...f, status: 'actif' }))}
                   >
                     <Check size={16} />
                     <span>Activer</span>
@@ -257,7 +257,7 @@ export default function UserDetailsModal({ open, onClose, user, onUpdate, allRol
                     }`}
                     onClick={() => {
                       if (window.confirm("Voulez-vous suspendre cet utilisateur ?")) {
-                        setForm(f => ({ ...f, status: 'suspendu' }))
+                        setForm((f: any) => ({ ...f, status: 'suspendu' }))
                       }
                     }}
                   >

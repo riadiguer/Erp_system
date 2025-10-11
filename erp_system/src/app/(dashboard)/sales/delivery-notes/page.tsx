@@ -1,12 +1,12 @@
 'use client';
 
-import { JSXElementConstructor, Key, ReactElement, ReactNode, ReactPortal, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { PermissionGate } from '@/components/guards/PermissionGate';
 import { SalesApi } from '@/lib/features/sales/api';
-import { useDeliveryNotes, useOrder, useOrdersLite } from '@/lib/features/sales/hooks';
+import { useDeliveryNotes, useOrder, useOrders } from '@/lib/features/sales/hooks';
 
-// ---- API contracts (expected) ----------------------------------------------
+// ---- Types ----------------------------------------------
 type DeliveryNoteStatus = 'DRAFT' | 'SENT' | 'DELIVERED' | 'CANCELLED';
 
 type ProductLite = { 
@@ -20,8 +20,8 @@ type OrderLineLite = {
   product: string;
   product_detail?: ProductLite;
   description?: string;
-  quantity: string;         // ordered
-  delivered_qty: string;    // already delivered across BLs
+  quantity: string;
+  delivered_qty: string;
 };
 
 type OrderLite = {
@@ -48,24 +48,43 @@ type DeliveryNote = {
   lines: DeliveryLine[];
 };
 
-// Remove unused API object since we're using SalesApi
-
 // ---- UI ---------------------------------------------------------------------
 export default function DeliveryNotesPage() {
   const router = useRouter();
   const { notes, loading, error, refresh } = useDeliveryNotes();
-  const { orders } = useOrdersLite(); // Assuming this returns an object with orders array
+  const { orders } = useOrders();
 
   const [creating, setCreating] = useState(false);
   const [orderId, setOrderId] = useState<string>('');
-  const { order } = useOrder(orderId); // Assuming this returns an object with order
-  const [rows, setRows] = useState<{ order_line: string; quantity: number }[]>([]);
+  const { order } = useOrder(orderId);
+  const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  useEffect(() => { 
-    setRows([]); 
-  }, [orderId]);
+  // Filter only CONFIRMED orders with remaining quantities
+  const confirmedOrders = useMemo(() => {
+    if (!orders) return [];
+    return orders.filter(o => 
+      o.status === 'CONFIRMED' || o.status === 'PART_DELIV'
+    );
+  }, [orders]);
+
+  // Reset quantities when order changes
+  useEffect(() => {
+    if (order?.lines) {
+      const initialQty: Record<string, number> = {};
+      order.lines.forEach(line => {
+        const remaining = Number(line.quantity) - Number(line.delivered_qty);
+        if (remaining > 0) {
+          initialQty[line.id] = Math.min(1, remaining);
+        }
+      });
+      setQuantities(initialQty);
+    } else {
+      setQuantities({});
+    }
+    setErr(null);
+  }, [order]);
 
   const remainingByLine = useMemo(() => {
     const map: Record<string, number> = {};
@@ -78,47 +97,105 @@ export default function DeliveryNotesPage() {
     return map;
   }, [order]);
 
-  function addRow(olId: string) {
-    if (!olId) return;
-    const exists = rows.some(r => r.order_line === olId);
-    if (!exists) {
-      const max = remainingByLine[olId] || 0;
-      setRows(r => [...r, { order_line: olId, quantity: Math.min(1, max) }]);
-    }
+  function updateQuantity(lineId: string, value: number) {
+    const max = remainingByLine[lineId] || 0;
+    setQuantities(prev => ({
+      ...prev,
+      [lineId]: Math.min(Math.max(0, value), max)
+    }));
   }
 
-  function updateRow(i: number, patch: Partial<{ quantity: number }>) {
-    setRows(prev => {
-      const copy = [...prev];
-      copy[i] = { ...copy[i], ...patch };
+  function toggleLine(lineId: string) {
+    setQuantities(prev => {
+      const copy = { ...prev };
+      if (lineId in copy) {
+        delete copy[lineId];
+      } else {
+        const max = remainingByLine[lineId] || 0;
+        copy[lineId] = Math.min(1, max);
+      }
       return copy;
     });
   }
 
-  function removeRow(i: number) {
-    setRows(prev => prev.filter((_, idx) => idx !== i));
-  }
-
   async function createNote() {
-    if (!orderId || rows.length === 0) return;
+    if (!orderId || Object.keys(quantities).length === 0) return;
+    
+    // Validate order is loaded
+    if (!order || !order.lines || order.id !== orderId) {
+      setErr('Order data not loaded. Please wait and try again.');
+      return;
+    }
+    
+    // Build lines array only for selected items with quantity > 0
+    const lines = Object.entries(quantities)
+      .filter(([_, qty]) => qty > 0)
+      .map(([lineId, qty]) => ({
+        order_line: lineId,
+        quantity: qty
+      }));
+
+    if (lines.length === 0) {
+      setErr('Please select at least one line with quantity > 0');
+      return;
+    }
+    
+    // Validate quantities
+    for (const line of lines) {
+      const max = remainingByLine[line.order_line] || 0;
+      if (line.quantity > max) {
+        setErr(`Quantity exceeds remaining amount for one or more items`);
+        return;
+      }
+    }
+    
     setBusy(true); 
     setErr(null);
     
     try {
-      const dn = await SalesApi.deliveryNotes.create({
+      const payload = {
         order: orderId,
-        lines: rows.map(r => ({ 
-          order_line: r.order_line, 
-          quantity: Number(r.quantity) 
-        })),
-      });
+        lines: lines
+      };
+      
+      console.log('Creating delivery note with payload:', payload);
+      
+      const dn = await SalesApi.deliveryNotes.create(payload);
+      
+      console.log('Delivery note created successfully:', dn);
+      
       setCreating(false);
       setOrderId('');
-      setRows([]);
+      setQuantities({});
       await refresh();
       router.push(`/sales/delivery-notes/${dn.id}`);
     } catch (e: any) {
-      setErr(e?.detail || 'Failed to create delivery note.');
+      console.error('Delivery note creation failed:', e);
+      
+      let errorMsg = 'Failed to create delivery note.';
+      
+      if (e?.response) {
+        try {
+          const data = await e.response.json();
+          console.log('API error response:', data);
+          errorMsg = data?.lines?.[0] || data?.detail || data?.error || data?.message || JSON.stringify(data);
+        } catch (jsonErr) {
+          try {
+            const text = await e.response.text();
+            errorMsg = text || errorMsg;
+          } catch (textErr) {
+            // Ignore
+          }
+        }
+      } else if (e?.detail) {
+        errorMsg = typeof e.detail === 'string' ? e.detail : JSON.stringify(e.detail);
+      } else if (e?.message) {
+        errorMsg = e.message;
+      } else if (typeof e === 'string') {
+        errorMsg = e;
+      }
+      
+      setErr(errorMsg);
     } finally {
       setBusy(false);
     }
@@ -158,6 +235,9 @@ export default function DeliveryNotesPage() {
     );
   }
 
+  const selectedLines = order?.lines.filter(l => l.id in quantities) || [];
+  const availableLines = order?.lines.filter(l => remainingByLine[l.id] > 0) || [];
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-6">
       <div className="max-w-7xl mx-auto space-y-8">
@@ -186,92 +266,150 @@ export default function DeliveryNotesPage() {
         {creating && (
           <div className="bg-white rounded-2xl shadow border border-gray-200 overflow-hidden">
             <div className="p-6 space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Order *</label>
-                  <select
-                    className="w-full rounded-xl border border-gray-300 px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    value={orderId}
-                    onChange={(e) => setOrderId(e.target.value)}
-                  >
-                    <option value="">Select order…</option>
-                    {(orders || []).map((o: OrderLite) => (
-                      <option key={o.id} value={o.id}>
-                        {o.code} — {o.customer_detail?.name || 'Unknown Customer'}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Add lines</label>
-                  <div className="flex gap-2">
-                    <select
-                      className="flex-1 rounded-xl border border-gray-300 px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      onChange={(e) => { 
-                        addRow(e.target.value); 
-                        e.currentTarget.selectedIndex = 0; 
-                      }}
-                      disabled={!orderId}
-                    >
-                      <option value="">Pick an order line…</option>
-                      {(order?.lines || []).map(ol => {
-                        const rem = remainingByLine[ol.id] || 0;
-                        return (
-                          <option key={ol.id} value={ol.id} disabled={rem <= 0}>
-                            {ol.product_detail?.sku || 'Unknown SKU'} — {ol.product_detail?.name || 'Unknown Product'} (remain {rem})
-                          </option>
-                        );
-                      })}
-                    </select>
-                  </div>
-                </div>
-              </div>
-
-              {/* Rows */}
-              <div className="space-y-3">
-                {rows.length === 0 ? (
-                  <div className="text-sm text-gray-500 italic">No lines added yet.</div>
-                ) : (
-                  rows.map((r, i) => {
-                    const ol = order?.lines.find(l => l.id === r.order_line);
-                    const max = remainingByLine[r.order_line] || 0;
-                    return (
-                      <div key={`${r.order_line}-${i}`} className="grid grid-cols-1 md:grid-cols-6 gap-3 items-center border border-gray-200 rounded-xl p-3">
-                        <div className="md:col-span-3">
-                          <div className="font-medium">
-                            {ol?.product_detail?.sku || 'Unknown SKU'} — {ol?.product_detail?.name || 'Unknown Product'}
-                          </div>
-                          <div className="text-xs text-gray-500">Remain: {max}</div>
-                        </div>
-                        <div>
-                          <label className="block text-xs text-gray-600 mb-1">Qty</label>
-                          <input
-                            type="number" 
-                            min={0} 
-                            max={max}
-                            step="0.001"
-                            className="w-full rounded-lg border border-gray-300 px-3 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                            value={r.quantity}
-                            onChange={(e) => {
-                              const value = Number(e.target.value || 0);
-                              updateRow(i, { quantity: Math.min(Math.max(0, value), max) });
-                            }}
-                          />
-                        </div>
-                        <div className="flex justify-center">
-                          <button 
-                            className="text-red-600 hover:text-red-700 text-sm font-semibold px-3 py-1 rounded hover:bg-red-50 transition-colors" 
-                            onClick={() => removeRow(i)}
-                            type="button"
-                          >
-                            Remove
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })
+              {/* Order Selection */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Select Confirmed Order *
+                </label>
+                <select
+                  className="w-full rounded-xl border border-gray-300 px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  value={orderId}
+                  onChange={(e) => setOrderId(e.target.value)}
+                >
+                  <option value="">Choose an order to deliver…</option>
+                  {confirmedOrders.map((o) => (
+                    <option key={o.id} value={o.id}>
+                      {o.code} — {o.customer_detail?.name || 'Unknown Customer'}
+                    </option>
+                  ))}
+                </select>
+                {orderId && confirmedOrders.length === 0 && (
+                  <p className="mt-2 text-sm text-amber-600">
+                    No confirmed orders available for delivery
+                  </p>
                 )}
               </div>
+
+              {/* Order Lines */}
+              {orderId && order && (
+                <>
+                  <div className="border-t pt-6">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                      Order Lines - Select items to deliver
+                    </h3>
+                    
+                    {availableLines.length === 0 ? (
+                      <div className="text-center py-8 text-gray-500">
+                        <svg className="w-12 h-12 mx-auto mb-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <p className="font-medium">All items fully delivered</p>
+                        <p className="text-sm mt-1">This order has no remaining quantities to deliver</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {order.lines.map(line => {
+                          const remaining = remainingByLine[line.id] || 0;
+                          const isSelected = line.id in quantities;
+                          const currentQty = quantities[line.id] || 0;
+                          
+                          if (remaining <= 0) return null;
+
+                          return (
+                            <div 
+                              key={line.id}
+                              className={`border rounded-xl p-4 transition-all ${
+                                isSelected 
+                                  ? 'border-blue-500 bg-blue-50' 
+                                  : 'border-gray-200 hover:border-gray-300'
+                              }`}
+                            >
+                              <div className="flex items-start gap-4">
+                                <div className="flex items-center pt-1">
+                                  <input
+                                    type="checkbox"
+                                    checked={isSelected}
+                                    onChange={() => toggleLine(line.id)}
+                                    className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500"
+                                  />
+                                </div>
+                                
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-start justify-between gap-4">
+                                    <div>
+                                      <div className="font-semibold text-gray-900">
+                                        {line.product_detail?.sku || 'Unknown SKU'}
+                                      </div>
+                                      <div className="text-sm text-gray-600 mt-0.5">
+                                        {line.product_detail?.name || 'Unknown Product'}
+                                      </div>
+                                      {line.description && (
+                                        <div className="text-xs text-gray-500 mt-1">
+                                          {line.description}
+                                        </div>
+                                      )}
+                                    </div>
+                                    
+                                    <div className="text-right flex-shrink-0">
+                                      <div className="text-sm text-gray-600">Ordered</div>
+                                      <div className="font-semibold">{line.quantity}</div>
+                                    </div>
+                                    
+                                    <div className="text-right flex-shrink-0">
+                                      <div className="text-sm text-gray-600">Delivered</div>
+                                      <div className="font-semibold">{line.delivered_qty}</div>
+                                    </div>
+                                    
+                                    <div className="text-right flex-shrink-0">
+                                      <div className="text-sm text-amber-600">Remaining</div>
+                                      <div className="font-bold text-amber-700">{remaining}</div>
+                                    </div>
+                                  </div>
+
+                                  {isSelected && (
+                                    <div className="mt-3 flex items-center gap-3">
+                                      <label className="text-sm font-medium text-gray-700 min-w-[120px]">
+                                        Quantity to deliver:
+                                      </label>
+                                      <input
+                                        type="number"
+                                        min={0}
+                                        max={remaining}
+                                        step="0.001"
+                                        value={currentQty}
+                                        onChange={(e) => updateQuantity(line.id, Number(e.target.value))}
+                                        className="w-32 rounded-lg border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                      />
+                                      <span className="text-sm text-gray-500">
+                                        (max: {remaining})
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {selectedLines.length > 0 && (
+                    <div className="border-t pt-4">
+                      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                        <div className="flex items-center gap-2 text-blue-900">
+                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          <span className="font-semibold">
+                            {selectedLines.length} item{selectedLines.length !== 1 ? 's' : ''} selected for delivery
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
 
               {err && (
                 <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-red-800">
@@ -279,13 +417,13 @@ export default function DeliveryNotesPage() {
                 </div>
               )}
 
-              <div className="flex gap-3 pt-2">
+              <div className="flex gap-3 pt-2 border-t">
                 <button 
                   className="rounded-xl border border-gray-300 px-5 py-2.5 hover:bg-gray-50 transition-colors" 
                   onClick={() => { 
                     setCreating(false); 
                     setOrderId(''); 
-                    setRows([]); 
+                    setQuantities({});
                     setErr(null);
                   }}
                   type="button"
@@ -294,11 +432,11 @@ export default function DeliveryNotesPage() {
                 </button>
                 <button
                   className="rounded-xl bg-black text-white px-6 py-2.5 hover:bg-neutral-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  disabled={!orderId || rows.length === 0 || busy}
+                  disabled={!orderId || selectedLines.length === 0 || busy}
                   onClick={createNote}
                   type="button"
                 >
-                  {busy ? 'Creating…' : 'Create Delivery Note'}
+                  {busy ? 'Creating…' : `Create Delivery Note (${selectedLines.length} items)`}
                 </button>
               </div>
             </div>
@@ -357,4 +495,3 @@ export default function DeliveryNotesPage() {
     </div>
   );
 }
-

@@ -3,15 +3,26 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/providers/auth-provider';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { 
+  ChevronDown, 
+  User, 
+  Settings, 
+  LogOut, 
+  Menu, 
+  X, 
+  Home,
+  Package,
+  ShoppingCart,
+  Building2,
+  Users,
+  BarChart3,
+  FileText,
+  Cog,
+  HelpCircle
+} from 'lucide-react';
 import { useState } from 'react';
 import { MENU, type MenuItem } from './menu';
 
-/**
- * Checks if the current user has the required permissions for a menu item.
- * - string need → must have it
- * - string[] need → OR logic (must have at least one)
- */
 function canSee(need?: string | string[], perms?: string[]) {
   if (!need) return true;
   const have = new Set(perms || []);
@@ -19,18 +30,31 @@ function canSee(need?: string | string[], perms?: string[]) {
   return need.some((n) => have.has(n));
 }
 
+const iconMap: Record<string, React.ReactNode> = {
+  '/dashboard': <Home className="w-5 h-5" />,
+  '/products': <Package className="w-5 h-5" />,
+  '/purchasing': <ShoppingCart className="w-5 h-5" />,
+  '/sales': <BarChart3 className="w-5 h-5" />,
+  '/stock': <Building2 className="w-5 h-5" />,
+  '/settings': <Cog className="w-5 h-5" />,
+  '/users': <Users className="w-5 h-5" />,
+  '/reports': <FileText className="w-5 h-5" />,
+};
+
 function Row({ 
   item, 
   depth = 0, 
   perms,
   expandedItems,
-  setExpandedItems
+  setExpandedItems,
+  onItemClick
 }: { 
   item: MenuItem; 
   depth?: number; 
   perms?: string[];
   expandedItems: Set<string>;
   setExpandedItems: React.Dispatch<React.SetStateAction<Set<string>>>;
+  onItemClick?: () => void;
 }) {
   const pathname = usePathname();
   if (!canSee(item.need, perms)) return null;
@@ -54,25 +78,43 @@ function Row({
     setExpandedItems(newExpanded);
   };
 
+  const handleClick = () => {
+    if (onItemClick) onItemClick();
+  };
+
+  const getIcon = () => {
+    return iconMap[item.href] || <div className="w-4 h-4 rounded-full bg-current opacity-50"></div>;
+  };
+
   return (
     <div>
       <div className="relative group">
         <Link
           href={item.href}
+          onClick={handleClick}
           className={`
-            flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all duration-200 relative
+            flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 relative
             ${active 
-              ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg' 
+              ? 'bg-blue-600 text-white shadow-md' 
               : hasActiveChild
-                ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                : 'text-slate-700 hover:bg-slate-50 hover:text-slate-900'
+                ? 'bg-blue-50 text-blue-700'
+                : 'text-gray-700 hover:bg-gray-100'
             }
           `}
-          style={{ marginLeft: depth * 16 }}
+          style={{ marginLeft: depth * 12 }}
         >
-          <span className={`flex items-center justify-center w-5 h-5 ${active ? 'text-white' : 'text-slate-500'}`}>
-            {/* Icon placeholder - add your icons here */}
-          </span>
+          <div className={`
+            flex items-center justify-center shrink-0
+            ${active 
+              ? 'text-white' 
+              : hasActiveChild
+                ? 'text-blue-600'
+                : 'text-gray-500'
+            }
+          `}>
+            {getIcon()}
+          </div>
+          
           <span className="flex-1 truncate">{item.label}</span>
           
           {hasChildren && (
@@ -80,30 +122,36 @@ function Row({
               onClick={toggleExpanded}
               className={`
                 p-0.5 rounded transition-transform duration-200
-                ${active ? 'text-white/80 hover:text-white' : 'text-slate-400 hover:text-slate-600'}
+                ${active 
+                  ? 'text-white/80' 
+                  : 'text-gray-400'
+                }
                 ${isExpanded ? 'rotate-0' : '-rotate-90'}
               `}
             >
               <ChevronDown className="w-4 h-4" />
             </button>
           )}
-        </Link>
 
-        {/* Active indicator */}
-        {active && (
-          <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-white rounded-r-full shadow-sm" />
-        )}
+          {active && (
+            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-blue-800 rounded-r-full"></div>
+          )}
+        </Link>
       </div>
 
-      {/* Children with smooth expand/collapse */}
       {hasChildren && (
         <div 
           className={`
-            overflow-hidden transition-all duration-300 ease-in-out
-            ${isExpanded || hasActiveChild ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'}
+            overflow-hidden transition-all duration-200
+            ${isExpanded || hasActiveChild ? 'max-h-[600px] opacity-100 mt-1' : 'max-h-0 opacity-0'}
           `}
         >
-          <div className="mt-1 space-y-1">
+          <div className="space-y-0.5 relative">
+            {(isExpanded || hasActiveChild) && depth === 0 && (
+              <div 
+                className="absolute left-5 top-0 bottom-0 w-px bg-gray-200" 
+              />
+            )}
             {item.children?.map((child) => (
               <Row 
                 key={child.href} 
@@ -112,6 +160,7 @@ function Row({
                 perms={perms}
                 expandedItems={expandedItems}
                 setExpandedItems={setExpandedItems}
+                onItemClick={onItemClick}
               />
             ))}
           </div>
@@ -125,8 +174,9 @@ export function Sidebar() {
   const { user } = useAuth();
   const pathname = usePathname();
   const perms = user?.permissions || [];
+  const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
   const [expandedItems, setExpandedItems] = useState<Set<string>>(() => {
-    // Auto-expand items that have active children
     const expanded = new Set<string>();
     MENU.forEach(item => {
       if (item.children?.some(child => 
@@ -138,52 +188,119 @@ export function Sidebar() {
     return expanded;
   });
 
-  return (
-    <aside className="hidden w-72 shrink-0 border-r border-slate-200/60 bg-white/80 backdrop-blur-md p-6 md:block sticky top-16 h-[calc(100vh-4rem)] overflow-y-auto">
-      {/* Header */}
-      <div className="mb-6">
-        <div className="flex items-center gap-2 mb-2">
-          <div className="w-2 h-2 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full"></div>
-          <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Navigation</h2>
-        </div>
-        <div className="h-px bg-gradient-to-r from-slate-200 via-slate-100 to-transparent"></div>
-      </div>
+  const closeMobile = () => setIsMobileOpen(false);
 
-      {/* Navigation */}
-      <nav className="space-y-2">
-        {MENU.map((item) => (
-          <Row 
-            key={item.href} 
-            item={item} 
-            perms={perms}
-            expandedItems={expandedItems}
-            setExpandedItems={setExpandedItems}
-          />
-        ))}
-      </nav>
+  const SidebarContent = () => (
+    <>
+      
 
-      {/* User info footer */}
+      {/* Profil utilisateur */}
       {user && (
-        <div className="mt-8 pt-6 border-t border-slate-200">
-          <div className="flex items-center gap-3 px-4 py-3 bg-slate-50/50 rounded-xl">
-            <div className="w-8 h-8 bg-gradient-to-br from-slate-400 to-slate-600 rounded-full flex items-center justify-center text-white text-sm font-medium">
-              {user.first_name?.[0]}{user.last_name?.[0]}
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-sm font-medium text-slate-800 truncate">
-                {user.first_name} {user.last_name}
+        <div className="mb-6 px-2">
+          <div className="relative">
+            
+
+            {showUserMenu && (
+              <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
+                <Link
+                  href="/profile"
+                  onClick={() => setShowUserMenu(false)}
+                  className="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  <User className="w-4 h-4" />
+                  Mon profil
+                </Link>
+                <Link
+                  href="/settings"
+                  onClick={() => setShowUserMenu(false)}
+                  className="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  <Settings className="w-4 h-4" />
+                  Paramètres
+                </Link>
+                <hr className="my-1 border-gray-200" />
+                <button
+                  onClick={() => {
+                    setShowUserMenu(false);
+                    // Logique de déconnexion ici
+                  }}
+                  className="w-full flex items-center gap-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                >
+                  <LogOut className="w-4 h-4" />
+                  Déconnexion
+                </button>
               </div>
-              <div className="text-xs text-slate-500 truncate">
-                {user.permissions?.slice(0, 2).join(', ')}
-                {user.permissions && user.permissions.length > 2 && '...'}
-              </div>
-            </div>
+            )}
           </div>
         </div>
       )}
 
-      {/* Scroll fade effect */}
-      <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-white/80 to-transparent pointer-events-none"></div>
-    </aside>
+      {/* Navigation */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="mb-3">
+          <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wide px-3">
+            Navigation
+          </h2>
+        </div>
+        
+        <nav className="space-y-1 px-2">
+          {MENU.map((item) => (
+            <Row 
+              key={item.href} 
+              item={item} 
+              perms={perms}
+              expandedItems={expandedItems}
+              setExpandedItems={setExpandedItems}
+              onItemClick={closeMobile}
+            />
+          ))}
+        </nav>
+      </div>
+
+      
+    </>
+  );
+
+  return (
+    <>
+      {/* Bouton menu mobile */}
+      <button
+        onClick={() => setIsMobileOpen(true)}
+        className="md:hidden fixed top-4 left-4 z-50 p-2.5 rounded-lg bg-white border border-gray-200 shadow-md hover:shadow-lg transition-shadow"
+      >
+        <Menu className="w-5 h-5 text-gray-700" />
+      </button>
+
+      {/* Overlay mobile */}
+      {isMobileOpen && (
+        <div 
+          className="md:hidden fixed inset-0 bg-black/50 z-40 backdrop-blur-sm"
+          onClick={() => setIsMobileOpen(false)}
+        />
+      )}
+
+      {/* Sidebar Desktop */}
+      <aside className="hidden md:flex w-72 shrink-0 border-r border-gray-200 bg-white">
+        <div className="flex flex-col w-full p-4 sticky top-0 h-screen">
+          <SidebarContent />
+        </div>
+      </aside>
+
+      {/* Sidebar Mobile */}
+      <aside className={`
+        md:hidden fixed left-0 top-0 z-50 w-72 h-full bg-white transform transition-transform duration-300 border-r border-gray-200 shadow-2xl
+        ${isMobileOpen ? 'translate-x-0' : '-translate-x-full'}
+      `}>
+        <div className="flex flex-col w-full p-4 h-full">
+          <button
+            onClick={() => setIsMobileOpen(false)}
+            className="absolute top-4 right-4 p-2 rounded-lg hover:bg-gray-100 transition-colors"
+          >
+            <X className="w-5 h-5 text-gray-600" />
+          </button>
+          <SidebarContent />
+        </div>
+      </aside>
+    </>
   );
 }

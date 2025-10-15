@@ -1,65 +1,32 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { 
   Briefcase, 
   Plus, 
   Search, 
   AlertTriangle, 
-  TrendingUp,
-  Users,
+  DollarSign,
   Layers,
-  DollarSign
+  Loader2
 } from "lucide-react";
+import { useProducts } from "@/lib/features/sales/hooks";
+import { SalesApi, type Product } from "@/lib/features/sales/api";
 import ServiceList from "./components/ServiceList";
 import ServiceModal from "./components/ServiceModal";
 import ServiceForm from "./components/ServiceForm";
 import StockAlert from "./components/StockAlert";
 
-const mockServices = [
-  {
-    id: 1,
-    name: "Conception graphique",
-    reference: "SV-001",
-    stock: 5,
-    minStock: 3,
-    unit: "forfait",
-    price: 8000,
-    category: "Création",
-  },
-  {
-    id: 2,
-    name: "Installation sur site",
-    reference: "SV-002",
-    stock: 15,
-    minStock: 5,
-    unit: "prestation",
-    price: 3000,
-    category: "Pose/Montage",
-  },
-  {
-    id: 3,
-    name: "Maintenance mensuelle",
-    reference: "SV-003",
-    stock: 8,
-    minStock: 10,
-    unit: "forfait",
-    price: 5000,
-    category: "Maintenance",
-  },
-  {
-    id: 4,
-    name: "Consulting stratégique",
-    reference: "SV-004",
-    stock: 12,
-    minStock: 8,
-    unit: "heure",
-    price: 15000,
-    category: "Consulting",
-  },
-];
+type StatCardProps = {
+  icon: React.ReactElement<any>;
+  title: string;
+  value: React.ReactNode;
+  subtitle?: string;
+  bgColor: string;
+  iconColor: string;
+};
 
-const StatCard = ({ icon, title, value, subtitle, bgColor, iconColor }) => (
+const StatCard: React.FC<StatCardProps> = ({ icon, title, value, subtitle, bgColor, iconColor }) => (
   <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
     <div className="flex items-center justify-between">
       <div>
@@ -77,25 +44,61 @@ const StatCard = ({ icon, title, value, subtitle, bgColor, iconColor }) => (
 );
 
 export default function ServicesPage() {
-  const [services, setServices] = useState(mockServices);
-  const [selectedService, setSelectedService] = useState(null);
+  const { products, loading, error, refresh } = useProducts();
+  const [selectedService, setSelectedService] = useState<Product | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
 
-  const handleViewDetails = (service) => {
+  // Filter only SERVICE type products that are active
+  const services = useMemo(() => 
+    products.filter(p => p.type === "SERVICE" && p.is_active), 
+    [products]
+  );
+
+  // Filter by search term
+  const filteredServices = useMemo(() => {
+    if (!searchTerm) return services;
+    const term = searchTerm.toLowerCase();
+    return services.filter(s => 
+      s.name.toLowerCase().includes(term) ||
+      s.sku.toLowerCase().includes(term) ||
+      (s.description && s.description.toLowerCase().includes(term))
+    );
+  }, [services, searchTerm]);
+
+  // --- Handlers ---
+  const handleViewDetails = (service: Product) => {
     setSelectedService(service);
     setShowModal(true);
   };
 
-  const handleEdit = (service) => {
+  const handleEdit = (service: Product) => {
     setSelectedService(service);
     setShowForm(true);
   };
 
-  const handleDelete = (serviceId) => {
-    setServices(services.filter((s) => s.id !== serviceId));
-    setShowModal(false);
+  const handleDelete = async (serviceId: string) => {
+    if (!window.confirm("Êtes-vous sûr de vouloir supprimer ce service ?")) {
+      return;
+    }
+    
+    try {
+      await SalesApi.products.remove(serviceId);
+      setShowModal(false);
+      setSelectedService(null);
+      await refresh();
+    } catch (err: any) {
+      console.error("Failed to delete service:", err);
+      if (err.message?.includes("JSON") || err.message?.includes("Unexpected end")) {
+        console.log("Delete might have succeeded despite JSON error, refreshing...");
+        setShowModal(false);
+        setSelectedService(null);
+        await refresh();
+      } else {
+        alert("Erreur lors de la suppression du service: " + (err.message || err));
+      }
+    }
   };
 
   const handleAddService = () => {
@@ -103,22 +106,77 @@ export default function ServicesPage() {
     setShowForm(true);
   };
 
-  const handleSaveService = (service) => {
-    if (service.id) {
-      setServices(services.map((s) => (s.id === service.id ? service : s)));
-    } else {
-      setServices([
-        ...services,
-        { ...service, id: Math.max(...services.map(s => s.id)) + 1 },
-      ]);
+  const handleSaveService = async (serviceData: Partial<Product>) => {
+    try {
+      // Ensure type is SERVICE
+      const payload = { ...serviceData, type: "SERVICE" as const };
+      
+      if (selectedService?.id) {
+        // Update existing service
+        await SalesApi.products.update(selectedService.id, payload);
+      } else {
+        // Create new service
+        await SalesApi.products.create(payload);
+      }
+      setShowForm(false);
+      refresh();
+    } catch (err) {
+      console.error("Failed to save service:", err);
+      alert("Erreur lors de l'enregistrement du service");
     }
-    setShowForm(false);
   };
 
-  const lowStockServices = services.filter((s) => s.stock < s.minStock);
-  const totalValue = services.reduce((sum, s) => sum + (s.stock * s.price), 0);
-  const categories = [...new Set(services.map(s => s.category))].length;
-  const averageStock = Math.round(services.reduce((sum, s) => sum + s.stock, 0) / services.length);
+  // Calculate statistics
+  const stats = useMemo(() => {
+    // Services don't typically track stock, but we can still show capacity metrics
+    const lowCapacity = services.filter(s => 
+      s.track_stock && parseFloat(s.stock_qty || "0") < 5
+    );
+    
+    const totalValue = services.reduce((sum, s) => {
+      const qty = parseFloat(s.stock_qty || "0");
+      const price = parseFloat(s.unit_price || "0");
+      return sum + (qty * price);
+    }, 0);
+    
+    const averageCapacity = services.length > 0
+      ? Math.round(services.reduce((sum, s) => 
+          sum + parseFloat(s.stock_qty || "0"), 0) / services.length)
+      : 0;
+
+    return { lowCapacity, totalValue, averageCapacity };
+  }, [services]);
+
+  // Loading state
+  if (loading && !products.length) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-indigo-600 mx-auto mb-4" />
+          <p className="text-gray-600">Chargement des services...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+          <p className="text-gray-900 font-semibold mb-2">Erreur de chargement</p>
+          <p className="text-gray-600 mb-4">Impossible de charger les services</p>
+          <button
+            onClick={() => refresh()}
+            className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+          >
+            Réessayer
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -156,7 +214,7 @@ export default function ServicesPage() {
           <StatCard
             icon={<AlertTriangle />}
             title="Capacité basse"
-            value={lowStockServices.length}
+            value={stats.lowCapacity.length}
             subtitle="Nécessite attention"
             bgColor="bg-red-100"
             iconColor="text-red-600"
@@ -165,7 +223,7 @@ export default function ServicesPage() {
           <StatCard
             icon={<DollarSign />}
             title="Valeur totale"
-            value={`${totalValue.toLocaleString()} DA`}
+            value={`${(stats.totalValue || 0).toLocaleString('fr-DZ')} DA`}
             subtitle="Capacité disponible"
             bgColor="bg-green-100"
             iconColor="text-green-600"
@@ -174,14 +232,14 @@ export default function ServicesPage() {
           <StatCard
             icon={<Layers />}
             title="Capacité moyenne"
-            value={averageStock}
-            subtitle={`${categories} catégories`}
+            value={stats.averageCapacity}
+            subtitle={`${services.length} services`}
             bgColor="bg-indigo-100"
             iconColor="text-indigo-600"
           />
         </div>
 
-        <StockAlert services={lowStockServices} />
+        <StockAlert services={stats.lowCapacity} />
 
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
           <div className="flex-1 max-w-lg">
@@ -189,7 +247,7 @@ export default function ServicesPage() {
               <Search className="w-5 h-5 absolute left-3 top-3 text-gray-400" />
               <input
                 type="text"
-                placeholder="Rechercher par nom, référence ou catégorie..."
+                placeholder="Rechercher par nom, référence ou description..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
@@ -207,7 +265,7 @@ export default function ServicesPage() {
         </div>
 
         <ServiceList
-          services={services}
+          services={filteredServices}
           searchTerm={searchTerm}
           onViewDetails={handleViewDetails}
           onEdit={handleEdit}
@@ -218,7 +276,10 @@ export default function ServicesPage() {
       {showModal && selectedService && (
         <ServiceModal
           service={selectedService}
-          onClose={() => setShowModal(false)}
+          onClose={() => {
+            setShowModal(false);
+            setSelectedService(null);
+          }}
           onEdit={handleEdit}
           onDelete={() => handleDelete(selectedService.id)}
         />

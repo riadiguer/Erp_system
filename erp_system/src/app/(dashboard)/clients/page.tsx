@@ -98,7 +98,23 @@ function getMonthRange(startISO: string, endISO: string) {
   return months;
 }
 
-const StatCard = ({ icon, title, value, subtitle, trend, bgColor, iconColor }) => (
+const StatCard = ({
+  icon,
+  title,
+  value,
+  subtitle,
+  trend,
+  bgColor,
+  iconColor,
+}: {
+  icon: React.ReactElement<any>;
+  title: string;
+  value: React.ReactNode;
+  subtitle?: string;
+  trend?: string;
+  bgColor: string;
+  iconColor: string;
+}) => (
   <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
     <div className="flex items-center justify-between">
       <div>
@@ -139,12 +155,17 @@ export default function ClientsPage() {
   };
 
   const saveClient = (payload: Client) => {
+    // Ensure 'type' is always defined
+    const client: Client = {
+      ...payload,
+      type: payload.type ?? "Particulier",
+    };
     setClients((prev) => {
-      const exists = prev.find((p) => p.id === payload.id);
+      const exists = prev.find((p) => p.id === client.id);
       if (exists) {
-        return prev.map((p) => (p.id === payload.id ? payload : p));
+        return prev.map((p) => (p.id === client.id ? client : p));
       }
-      return [payload, ...prev];
+      return [client, ...prev];
     });
     setIsFormOpen(false);
   };
@@ -296,7 +317,21 @@ export default function ClientsPage() {
               </div>
               <ClientTable
                 clients={filtered}
-                onView={(c) => setSelectedClient(c)}
+                onView={(c) =>
+                  setSelectedClient({
+                    id: c.id,
+                    firstName: c.firstName ?? "",
+                    lastName: c.lastName ?? "",
+                    email: c.email ?? "",
+                    phone: c.phone ?? "",
+                    type: c.type ?? "Particulier",
+                    balance: c.balance ?? 0,
+                    revenue: c.revenue ?? 0,
+                    lastOrder: c.lastOrder ?? "",
+                    createdAt: c.createdAt ?? "",
+                    status: c.status ?? "Actif",
+                  })
+                }
                 onEdit={openEditClient}
                 onDelete={(id) => deleteClient(id)}
               />
@@ -343,11 +378,32 @@ export default function ClientsPage() {
 
       <ClientDetailsModal
         open={!!selectedClient}
-        client={selectedClient}
+        client={
+          selectedClient
+            ? {
+                ...selectedClient,
+                revenue: selectedClient.revenue ?? 0,
+              }
+            : null
+        }
         onClose={() => setSelectedClient(null)}
         onEdit={(c) => {
           setSelectedClient(null);
-          openEditClient(c);
+          // Convert ClientMini to Client if needed
+          const client: Client = {
+            id: c.id,
+            firstName: c.firstName ?? "",
+            lastName: c.lastName ?? "",
+            email: c.email ?? "",
+            phone: c.phone ?? "",
+            type: c.type ?? "Particulier",
+            balance: c.balance ?? 0,
+            revenue: c.revenue ?? 0,
+            lastOrder: c.lastOrder ?? "",
+            createdAt: c.createdAt ?? "",
+            status: c.status ?? "Actif",
+          };
+          openEditClient(client);
         }}
         onAddPayment={(c) => alert("Ajouter paiement — à implémenter")}
         onNewOrder={(c) => alert("Créer commande — à implémenter")}

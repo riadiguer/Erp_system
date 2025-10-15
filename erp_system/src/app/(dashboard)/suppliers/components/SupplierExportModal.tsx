@@ -2,13 +2,20 @@
 
 import { X, FileSpreadsheet, FileText, Download, Check } from "lucide-react";
 import { useState } from "react";
+import type { Supplier } from "@/lib/features/warehouse/types";
+
+type FormatValue = "pdf" | "excel";
+type ScopeValue  = "all" | "selected" | "details";
 
 interface SupplierExportModalProps {
   open: boolean;
   onClose: () => void;
+  onSuccess?: (exported?: { format: FormatValue; scope: ScopeValue }) => void;
+  suppliers?: Supplier[]; // ✅ add this
 }
 
-export default function SupplierExportModal({ open, onClose }: SupplierExportModalProps) {
+export default function SupplierExportModal({ open, onClose , onSuccess,
+  suppliers = [],}: SupplierExportModalProps) {
   const [format, setFormat] = useState<"pdf" | "excel" | "">("");
   const [scope, setScope] = useState<"all" | "selected" | "details" | "">("");
 

@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     'accounts',
     "rbac",
     'sales',
+    'warehouse',  
     'django_filters',
 ]
 

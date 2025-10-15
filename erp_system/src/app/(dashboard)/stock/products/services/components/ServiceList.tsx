@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { 
   Eye, 
   Edit, 
@@ -12,6 +12,15 @@ import {
   List,
   DollarSign
 } from "lucide-react";
+import { type Product } from "@/lib/features/sales/api";
+
+interface ServiceListProps {
+  services: Product[];
+  searchTerm: string;
+  onViewDetails: (service: Product) => void;
+  onEdit: (service: Product) => void;
+  onDelete: (serviceId: string) => void;
+}
 
 export default function ServiceList({
   services,
@@ -19,23 +28,27 @@ export default function ServiceList({
   onViewDetails,
   onEdit,
   onDelete,
-}) {
-  const [filterCategory, setFilterCategory] = useState("");
-  const [viewMode, setViewMode] = useState("grid");
+}: ServiceListProps) {
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
-  const filteredServices = services.filter((service) => {
-    const matchesSearch =
-      service.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      service.reference.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = filterCategory
-      ? service.category === filterCategory
-      : true;
-    return matchesSearch && matchesCategory;
-  });
+  // Filter services (already filtered by searchTerm in parent)
+  const filteredServices = services;
 
-  const categories = Array.from(new Set(services.map((s) => s.category)));
+  const getStockStatus = (stockQty: string, trackStock: boolean) => {
+    if (!trackStock) {
+      return {
+        status: "N/A",
+        color: "gray",
+        icon: <Briefcase className="w-4 h-4" />,
+        bgColor: "bg-gray-50",
+        borderColor: "border-gray-200",
+        textColor: "text-gray-700"
+      };
+    }
 
-  const getStockStatus = (stock, minStock) => {
+    const stock = parseFloat(stockQty || "0");
+    const minStock = 5; // Threshold for services
+
     const percentage = (stock / minStock) * 100;
     if (percentage < 50) return { 
       status: "Critique", 
@@ -66,8 +79,12 @@ export default function ServiceList({
   const GridView = () => (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       {filteredServices.map((service) => {
-        const stockStatus = getStockStatus(service.stock, service.minStock);
-        const percentage = Math.round((service.stock / service.minStock) * 100);
+        const stockStatus = getStockStatus(service.stock_qty, service.track_stock);
+        const stockQty = parseFloat(service.stock_qty || "0");
+        const unitPrice = parseFloat(service.unit_price || "0");
+        const totalValue = stockQty * unitPrice;
+        const minStock = 5;
+        const percentage = service.track_stock ? Math.round((stockQty / minStock) * 100) : 100;
 
         return (
           <div
@@ -84,7 +101,7 @@ export default function ServiceList({
                     <h3 className="font-semibold text-gray-900 truncate group-hover:text-indigo-600 transition-colors">
                       {service.name}
                     </h3>
-                    <p className="text-sm text-gray-500">{service.reference}</p>
+                    <p className="text-sm text-gray-500">{service.sku}</p>
                   </div>
                 </div>
                 <span className={`inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full ${stockStatus.bgColor} ${stockStatus.textColor} border ${stockStatus.borderColor}`}>
@@ -97,44 +114,48 @@ export default function ServiceList({
             <div className="p-4">
               <div className="space-y-3 mb-4">
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-600">Catégorie</span>
+                  <span className="text-gray-600">Unité</span>
                   <span className="font-medium text-gray-900 bg-gray-100 px-2 py-1 rounded">
-                    {service.category}
+                    {service.unit || "N/A"}
                   </span>
                 </div>
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-gray-600">Prix unitaire</span>
                   <span className="font-medium text-gray-900 flex items-center">
                     <DollarSign className="w-4 h-4 mr-1" />
-                    {service.price.toLocaleString()} DA
+                    {(unitPrice || 0).toLocaleString("fr-DZ")} DA
                   </span>
                 </div>
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-600">Unité</span>
-                  <span className="font-medium text-gray-900">{service.unit}</span>
+                  <span className="text-gray-600">Valeur totale</span>
+                  <span className="font-medium text-gray-900">
+                    {(totalValue || 0).toLocaleString("fr-DZ")} DA
+                  </span>
                 </div>
               </div>
 
-              <div className="mb-4">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-gray-700">Capacité</span>
-                  <span className="text-sm font-bold text-gray-900">
-                    {service.stock} / {service.minStock} {service.unit}
-                  </span>
-                </div>
-                <div className="relative">
-                  <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
-                    <div
-                      className={`h-full bg-${stockStatus.color}-500 transition-all duration-500 rounded-full`}
-                      style={{ width: `${Math.min(percentage, 100)}%` }}
-                    />
+              {service.track_stock && (
+                <div className="mb-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium text-gray-700">Capacité</span>
+                    <span className="text-sm font-bold text-gray-900">
+                      {stockQty || 0} {service.unit || "unité"}
+                    </span>
                   </div>
-                  <div className="flex justify-between mt-1">
-                    <span className="text-xs text-gray-500">{percentage}%</span>
-                    <span className="text-xs text-gray-500">de la capacité min.</span>
+                  <div className="relative">
+                    <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                      <div
+                        className={`h-full bg-${stockStatus.color}-500 transition-all duration-500 rounded-full`}
+                        style={{ width: `${Math.min(percentage, 100)}%` }}
+                      />
+                    </div>
+                    <div className="flex justify-between mt-1">
+                      <span className="text-xs text-gray-500">{percentage}%</span>
+                      <span className="text-xs text-gray-500">de la capacité</span>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
 
               <div className="flex items-center gap-2 pt-4 border-t border-gray-100">
                 <button
@@ -166,18 +187,6 @@ export default function ServiceList({
                 </button>
               </div>
             </div>
-
-            {service.stock < service.minStock && (
-              <div className="px-4 py-3 bg-gray-50 border-t border-gray-100">
-                <button
-                  className="w-full flex items-center justify-center px-3 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm font-medium"
-                  onClick={() => alert("Planification à implémenter")}
-                >
-                  <Calendar className="w-4 h-4 mr-2" />
-                  Planifier ce service
-                </button>
-              </div>
-            )}
           </div>
         );
       })}
@@ -194,7 +203,7 @@ export default function ServiceList({
                 Service
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Catégorie
+                Unité
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Prix
@@ -212,7 +221,11 @@ export default function ServiceList({
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {filteredServices.map((service) => {
-              const stockStatus = getStockStatus(service.stock, service.minStock);
+              const stockStatus = getStockStatus(service.stock_qty, service.track_stock);
+              const stockQty = parseFloat(service.stock_qty || "0");
+              const unitPrice = parseFloat(service.unit_price || "0");
+              const minStock = 5;
+              const percentage = service.track_stock ? (stockQty / minStock) * 100 : 100;
               
               return (
                 <tr key={service.id} className="hover:bg-gray-50 transition-colors">
@@ -223,32 +236,38 @@ export default function ServiceList({
                       </div>
                       <div className="ml-3">
                         <div className="text-sm font-medium text-gray-900">{service.name}</div>
-                        <div className="text-sm text-gray-500">{service.reference}</div>
+                        <div className="text-sm text-gray-500">{service.sku}</div>
                       </div>
                     </div>
                   </td>
                   
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className="text-sm text-gray-900 bg-gray-100 px-2 py-1 rounded">
-                      {service.category}
+                      {service.unit || "N/A"}
                     </span>
                   </td>
                   
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    {service.price.toLocaleString()} DA
+                    {(unitPrice || 0).toLocaleString("fr-DZ")} DA
                   </td>
                   
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm">
-                      <div className="font-medium text-gray-900">
-                        {service.stock} / {service.minStock} {service.unit}
-                      </div>
-                      <div className="w-24 bg-gray-200 rounded-full h-1.5 mt-1">
-                        <div
-                          className={`h-full bg-${stockStatus.color}-500 rounded-full`}
-                          style={{ width: `${Math.min((service.stock / service.minStock) * 100, 100)}%` }}
-                        />
-                      </div>
+                      {service.track_stock ? (
+                        <>
+                          <div className="font-medium text-gray-900">
+                            {stockQty || 0} {service.unit || "unité"}
+                          </div>
+                          <div className="w-24 bg-gray-200 rounded-full h-1.5 mt-1">
+                            <div
+                              className={`h-full bg-${stockStatus.color}-500 rounded-full`}
+                              style={{ width: `${Math.min(percentage, 100)}%` }}
+                            />
+                          </div>
+                        </>
+                      ) : (
+                        <span className="text-gray-500">Non suivi</span>
+                      )}
                     </div>
                   </td>
                   
@@ -301,19 +320,6 @@ export default function ServiceList({
     <div>
       <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
         <div className="flex items-center gap-3">
-          <select
-            className="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-            value={filterCategory}
-            onChange={(e) => setFilterCategory(e.target.value)}
-          >
-            <option value="">Toutes catégories</option>
-            {categories.map((cat) => (
-              <option key={cat} value={cat}>
-                {cat}
-              </option>
-            ))}
-          </select>
-          
           <div className="text-sm text-gray-600">
             {filteredServices.length} service{filteredServices.length > 1 ? "s" : ""}
           </div>
@@ -352,7 +358,7 @@ export default function ServiceList({
             Aucun service trouvé
           </h3>
           <p className="text-gray-500">
-            {searchTerm || filterCategory
+            {searchTerm
               ? "Essayez de modifier vos critères de recherche."
               : "Commencez par ajouter votre premier service."}
           </p>

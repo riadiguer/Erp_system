@@ -1,65 +1,32 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { 
   Package, 
   Plus, 
   Search, 
   AlertTriangle, 
-  TrendingUp,
-  ShoppingBag,
+  DollarSign,
   Layers,
-  DollarSign
+  Loader2
 } from "lucide-react";
+import { useProducts } from "@/lib/features/sales/hooks";
+import { SalesApi, type Product } from "@/lib/features/sales/api";
 import ProductList from "./components/ProductList";
 import ProductModal from "./components/ProductModal";
 import ProductForm from "./components/ProductForm";
 import StockAlert from "./components/StockAlert";
 
-const mockProducts = [
-  {
-    id: 1,
-    name: "Roll-up Publicitaire",
-    reference: "PR-001",
-    stock: 8,
-    minStock: 10,
-    unit: "pièce",
-    price: 3400,
-    category: "Affichage",
-  },
-  {
-    id: 2,
-    name: "Banderole PVC",
-    reference: "PR-002",
-    stock: 35,
-    minStock: 15,
-    unit: "mètre",
-    price: 1200,
-    category: "Affichage",
-  },
-  {
-    id: 3,
-    name: "Panneau Akilux",
-    reference: "PR-003",
-    stock: 22,
-    minStock: 20,
-    unit: "pièce",
-    price: 850,
-    category: "Affichage",
-  },
-  {
-    id: 4,
-    name: "Stickers personnalisés",
-    reference: "PR-004",
-    stock: 150,
-    minStock: 100,
-    unit: "paquet",
-    price: 450,
-    category: "Impression",
-  },
-];
+type StatCardProps = {
+  icon: React.ReactElement;
+  title: string;
+  value: React.ReactNode;
+  subtitle?: string;
+  bgColor: string;
+  iconColor: string;
+};
 
-const StatCard = ({ icon, title, value, subtitle, bgColor, iconColor }) => (
+const StatCard: React.FC<StatCardProps> = ({ icon, title, value, subtitle, bgColor, iconColor }) => (
   <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
     <div className="flex items-center justify-between">
       <div>
@@ -70,33 +37,61 @@ const StatCard = ({ icon, title, value, subtitle, bgColor, iconColor }) => (
         )}
       </div>
       <div className={`p-3 rounded-full ${bgColor}`}>
-        {React.cloneElement(icon, { className: `w-6 h-6 ${iconColor}` })}
+        {React.cloneElement(icon as React.ReactElement<any>, { className: `w-6 h-6 ${iconColor}` })}
       </div>
     </div>
   </div>
 );
 
 export default function FinishedProductsPage() {
-  const [products, setProducts] = useState(mockProducts);
-  const [selectedProduct, setSelectedProduct] = useState(null);
+  const { products, loading, error, refresh } = useProducts();
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
 
+  // Filter active products
+  const activeProducts = useMemo(() => 
+    products.filter(p => p.is_active), 
+    [products]
+  );
+
+  // Filter by search term
+  const filteredProducts = useMemo(() => {
+    if (!searchTerm) return activeProducts;
+    const term = searchTerm.toLowerCase();
+    return activeProducts.filter(p => 
+      p.name.toLowerCase().includes(term) ||
+      p.sku.toLowerCase().includes(term) ||
+      (p.description && p.description.toLowerCase().includes(term))
+    );
+  }, [activeProducts, searchTerm]);
+
   // --- Handlers ---
-  const handleViewDetails = (product) => {
+  const handleViewDetails = (product: Product) => {
     setSelectedProduct(product);
     setShowModal(true);
   };
 
-  const handleEdit = (product) => {
+  const handleEdit = (product: Product) => {
     setSelectedProduct(product);
     setShowForm(true);
   };
 
-  const handleDelete = (productId) => {
-    setProducts(products.filter((p) => p.id !== productId));
-    setShowModal(false);
+  const handleDelete = async (productId: string) => {
+    if (!window.confirm("Êtes-vous sûr de vouloir supprimer ce produit ?")) {
+      return;
+    }
+    
+    try {
+      await SalesApi.products.remove(productId);
+      setShowModal(false);
+      setSelectedProduct(null);
+      refresh();
+    } catch (err) {
+      console.error("Failed to delete product:", err);
+      alert("Erreur lors de la suppression du produit");
+    }
   };
 
   const handleAddProduct = () => {
@@ -104,23 +99,73 @@ export default function FinishedProductsPage() {
     setShowForm(true);
   };
 
-  const handleSaveProduct = (product) => {
-    if (product.id) {
-      setProducts(products.map((p) => (p.id === product.id ? product : p)));
-    } else {
-      setProducts([
-        ...products,
-        { ...product, id: Math.max(...products.map(p => p.id)) + 1 },
-      ]);
+  const handleSaveProduct = async (productData: Partial<Product>) => {
+    try {
+      if (selectedProduct?.id) {
+        // Update existing product
+        await SalesApi.products.update(selectedProduct.id, productData);
+      } else {
+        // Create new product
+        await SalesApi.products.create(productData);
+      }
+      setShowForm(false);
+      refresh();
+    } catch (err) {
+      console.error("Failed to save product:", err);
+      alert("Erreur lors de l'enregistrement du produit");
     }
-    setShowForm(false);
   };
 
-  // Calculs pour les statistiques
-  const lowStockProducts = products.filter((p) => p.stock < p.minStock);
-  const totalValue = products.reduce((sum, p) => sum + (p.stock * p.price), 0);
-  const categories = [...new Set(products.map(p => p.category))].length;
-  const averageStock = Math.round(products.reduce((sum, p) => sum + p.stock, 0) / products.length);
+  // Calculate statistics
+  const stats = useMemo(() => {
+    const lowStock = activeProducts.filter(p => 
+      p.track_stock && parseFloat(p.stock_qty || "0") < 10 // You can adjust threshold
+    );
+    
+    const totalValue = activeProducts.reduce((sum, p) => 
+      sum + (parseFloat(p.stock_qty || "0") * parseFloat(p.unit_price || "0")), 0
+    );
+    
+    const categories = new Set(activeProducts.map(p => p.type)).size;
+    
+    const averageStock = activeProducts.length > 0
+      ? Math.round(activeProducts.reduce((sum, p) => 
+          sum + parseFloat(p.stock_qty || "0"), 0) / activeProducts.length)
+      : 0;
+
+    return { lowStock, totalValue, categories, averageStock };
+  }, [activeProducts]);
+
+  // Loading state
+  if (loading && !products.length) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-green-600 mx-auto mb-4" />
+          <p className="text-gray-600">Chargement des produits...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+          <p className="text-gray-900 font-semibold mb-2">Erreur de chargement</p>
+          <p className="text-gray-600 mb-4">Impossible de charger les produits</p>
+          <button
+            onClick={() => refresh()}
+            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+          >
+            Réessayer
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -152,8 +197,8 @@ export default function FinishedProductsPage() {
           <StatCard
             icon={<Package />}
             title="Total produits"
-            value={products.length}
-            subtitle="Produits finis"
+            value={activeProducts.length}
+            subtitle="Produits actifs"
             bgColor="bg-blue-100"
             iconColor="text-blue-600"
           />
@@ -161,8 +206,8 @@ export default function FinishedProductsPage() {
           <StatCard
             icon={<AlertTriangle />}
             title="Stock bas"
-            value={lowStockProducts.length}
-            subtitle="Nécessite production"
+            value={stats.lowStock.length}
+            subtitle="Nécessite réapprovisionnement"
             bgColor="bg-red-100"
             iconColor="text-red-600"
           />
@@ -170,7 +215,7 @@ export default function FinishedProductsPage() {
           <StatCard
             icon={<DollarSign />}
             title="Valeur totale"
-            value={`${totalValue.toLocaleString()} DA`}
+            value={`${(stats.totalValue || 0).toLocaleString('fr-DZ')} DA`}
             subtitle="Stock actuel"
             bgColor="bg-green-100"
             iconColor="text-green-600"
@@ -179,15 +224,15 @@ export default function FinishedProductsPage() {
           <StatCard
             icon={<Layers />}
             title="Stock moyen"
-            value={averageStock}
-            subtitle={`${categories} catégories`}
+            value={stats.averageStock}
+            subtitle={`${stats.categories} types`}
             bgColor="bg-purple-100"
             iconColor="text-purple-600"
           />
         </div>
 
         {/* Alerte stock bas */}
-        <StockAlert products={lowStockProducts} />
+        <StockAlert products={stats.lowStock} />
 
         {/* Actions principales */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
@@ -196,7 +241,7 @@ export default function FinishedProductsPage() {
               <Search className="w-5 h-5 absolute left-3 top-3 text-gray-400" />
               <input
                 type="text"
-                placeholder="Rechercher par nom, référence ou catégorie..."
+                placeholder="Rechercher par nom, référence ou description..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
@@ -215,7 +260,7 @@ export default function FinishedProductsPage() {
 
         {/* Liste des produits */}
         <ProductList
-          products={products}
+          products={filteredProducts}
           searchTerm={searchTerm}
           onViewDetails={handleViewDetails}
           onEdit={handleEdit}
@@ -227,7 +272,10 @@ export default function FinishedProductsPage() {
       {showModal && selectedProduct && (
         <ProductModal
           product={selectedProduct}
-          onClose={() => setShowModal(false)}
+          onClose={() => {
+            setShowModal(false);
+            setSelectedProduct(null);
+          }}
           onEdit={handleEdit}
           onDelete={() => handleDelete(selectedProduct.id)}
         />

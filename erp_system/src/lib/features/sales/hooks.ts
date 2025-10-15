@@ -17,8 +17,20 @@ export function useCustomers() {
 }
 
 export function useProducts() {
-  const { data, error } = useSWR<Product[]>('/sales/products/', SalesApi.products.list);
-  return { products: data, loading: !data && !error, error };
+  const { data, error, mutate, isValidating } = useSWR<Product[]>(
+    '/sales/products/',
+    SalesApi.products.list
+  );
+  return { products: data || [], loading: !data && !error, error, refresh: mutate, isValidating };
+}
+
+export function useProduct(id?: string) {
+  const key = id ? `/sales/products/${id}/` : null;
+  const { data, error, mutate, isValidating } = useSWR<Product | undefined>(
+    key,
+    () => SalesApi.products.get!(id!)  // If you don’t have .get, see API step below
+  );
+  return { product: data, loading: !!id && !data && !error, error, refresh: mutate, isValidating };
 }
 
 export function useOrder(id?: string) {

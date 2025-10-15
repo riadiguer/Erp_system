@@ -1,22 +1,22 @@
 "use client";
 
 import { useState } from "react";
-import { 
-  Users, 
-  Plus, 
-  Download, 
-  Upload, 
+import {
+  Users,
+  Plus,
+  Download,
+  Upload,
   Filter,
   TrendingUp,
   TrendingDown,
-  Activity,
   CreditCard,
   FileText,
   Package,
   DollarSign,
   ShoppingBag,
   AlertCircle,
-  ArrowUpRight
+  ArrowUpRight,
+  Loader2,
 } from "lucide-react";
 
 import SupplierTable from "./components/SupplierTable";
@@ -30,38 +30,49 @@ import SupplierPaymentsModal from "./components/SupplierPaymentsModal";
 import SupplierOrderModal from "./components/SupplierOrderModal";
 import SupplierStatsChart from "./components/Charts/SupplierStatsChart";
 import SupplierEvolutionChart from "./components/Charts/SupplierEvolutionChart";
+import { useSuppliers } from "@/lib/features/warehouse/hooks";
+import { Supplier } from "@/lib/features/warehouse/types";
+import { toast } from "sonner";
 
-const StatCard = ({ 
-  icon, 
-  title, 
-  value, 
-  change, 
-  changeType,
-  gradient 
-}: {
+type StatCardProps = {
   icon: React.ReactNode;
   title: string;
   value: string;
   change: string;
   changeType: "positive" | "negative";
+  /** Example: "from-blue-500 to-blue-600" (consider safelisting in Tailwind) */
   gradient: string;
-}) => (
+};
+
+
+
+const StatCard = ({
+  icon,
+  title,
+  value,
+  change,
+  changeType,
+  gradient,
+}: StatCardProps) => (
   <div className="group relative bg-white p-6 rounded-2xl border border-gray-200 shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden">
     {/* Gradient background on hover */}
-    <div className={`absolute inset-0 bg-gradient-to-br ${gradient} opacity-0 group-hover:opacity-5 transition-opacity duration-300`}></div>
-    
+    <div
+      className={`absolute inset-0 bg-gradient-to-br ${gradient} opacity-0 group-hover:opacity-5 transition-opacity duration-300`}
+    />
     {/* Decorative circle */}
-    <div className="absolute -top-10 -right-10 w-32 h-32 bg-blue-50 rounded-full opacity-20 group-hover:scale-150 transition-transform duration-500"></div>
-    
+    <div className="absolute -top-10 -right-10 w-32 h-32 bg-blue-50 rounded-full opacity-20 group-hover:scale-150 transition-transform duration-500" />
+
     <div className="relative z-10">
       <div className="flex items-start justify-between mb-4">
-        <div className={`p-3 rounded-xl bg-gradient-to-br ${gradient} shadow-lg group-hover:scale-110 transition-transform duration-300`}>
+        <div
+          className={`p-3 rounded-xl bg-gradient-to-br ${gradient} shadow-lg group-hover:scale-110 transition-transform duration-300`}
+        >
           {icon}
         </div>
         <div
           className={`flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-semibold ${
-            changeType === "positive" 
-              ? "bg-green-50 text-green-700" 
+            changeType === "positive"
+              ? "bg-green-50 text-green-700"
               : "bg-red-50 text-red-700"
           }`}
         >
@@ -73,7 +84,7 @@ const StatCard = ({
           <span>{change}</span>
         </div>
       </div>
-      
+
       <div>
         <p className="text-sm font-medium text-gray-600 mb-1">{title}</p>
         <p className="text-3xl font-bold text-gray-900 tracking-tight">{value}</p>
@@ -82,17 +93,27 @@ const StatCard = ({
   </div>
 );
 
-const ActionButton = ({ 
-  icon: Icon, 
-  label, 
-  onClick, 
-  variant = "default" 
-}: any) => {
-  const variants = {
-    default: "border border-gray-300 hover:border-gray-400 bg-white hover:bg-gray-50 text-gray-700 shadow-sm",
-    primary: "bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg shadow-blue-200 hover:shadow-xl hover:shadow-blue-300"
-  };
-  
+type Variant = "default" | "primary";
+
+type ActionButtonProps = {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  onClick: () => void;
+  variant?: Variant;
+};
+
+const ActionButton = ({
+  icon: Icon,
+  label,
+  onClick,
+  variant = "default",
+}: ActionButtonProps) => {
+const variants: Record<Variant, string> = {
+  default:
+    "border border-gray-300 hover:border-gray-400 bg-white hover:bg-gray-50 text-gray-700 shadow-sm",
+  primary:
+    "bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg shadow-blue-200 hover:shadow-xl hover:shadow-blue-300",
+};
   return (
     <button
       onClick={onClick}
@@ -104,19 +125,29 @@ const ActionButton = ({
   );
 };
 
-const QuickActionCard = ({ 
-  icon: Icon, 
-  title, 
-  count, 
+type QuickActionCardProps = {
+  icon: React.ComponentType<{ className?: string }>;
+  title: string;
+  count: string | number;
+  color: string; // e.g. "bg-blue-500"
+  onClick: () => void;
+};
+
+const QuickActionCard = ({
+  icon: Icon,
+  title,
+  count,
   color,
-  onClick 
-}: any) => (
+  onClick,
+}: QuickActionCardProps) => (
   <button
     onClick={onClick}
     className="group flex items-center justify-between p-4 bg-white rounded-xl border border-gray-200 hover:border-blue-300 hover:shadow-lg transition-all duration-300"
   >
     <div className="flex items-center space-x-3">
-      <div className={`p-2.5 rounded-lg ${color} group-hover:scale-110 transition-transform duration-300`}>
+      <div
+        className={`p-2.5 rounded-lg ${color} group-hover:scale-110 transition-transform duration-300`}
+      >
         <Icon className="w-5 h-5 text-white" />
       </div>
       <div className="text-left">
@@ -129,6 +160,14 @@ const QuickActionCard = ({
 );
 
 export default function SuppliersDashboard() {
+  // Hooks API
+  const { suppliers, loading, error, refresh, isValidating } = useSuppliers();
+
+  // Safeguards (avoid undefined access)
+  const suppliersList: Supplier[] = Array.isArray(suppliers) ? suppliers : [];
+  const validating = Boolean(isValidating ?? loading);
+
+  // State pour les modales
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
@@ -137,17 +176,51 @@ export default function SuppliersDashboard() {
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
   const [isOrderOpen, setIsOrderOpen] = useState(false);
-  const [selectedSupplier, setSelectedSupplier] = useState<any>(null);
+  const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
+
+  // Calculer les stats
+  const totalSuppliers = suppliersList.length;
+  const activeSuppliers = suppliersList.filter(
+    (s) => (s as any).materials_count && (s as any).materials_count > 0
+  ).length;
+
+  // Loading state
+  if (loading && suppliersList.length === 0) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-12 h-12 text-blue-600 animate-spin mx-auto mb-4" />
+          <p className="text-gray-600 font-medium">Chargement des fournisseurs...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-gray-50 flex items-center justify-center">
+        <div className="text-center bg-white p-8 rounded-2xl shadow-xl border border-red-200">
+          <AlertCircle className="w-16 h-16 text-red-600 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Erreur de chargement</h2>
+          <p className="text-gray-600 mb-4">Impossible de charger les fournisseurs</p>
+          <button
+            onClick={() => refresh?.()}
+            className="px-6 py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition-colors"
+          >
+            Réessayer
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-gray-50 p-6">
       <div className="max-w-7xl mx-auto space-y-8">
-        
         {/* Header Section */}
         <div className="relative">
-          {/* Decorative background */}
-          <div className="absolute inset-0 bg-gradient-to-r from-blue-600/5 to-purple-600/5 rounded-3xl blur-3xl"></div>
-          
+          <div className="absolute inset-0 bg-gradient-to-r from-blue-600/5 to-purple-600/5 rounded-3xl blur-3xl" />
           <div className="relative bg-white/80 backdrop-blur-sm rounded-2xl border border-gray-200 shadow-xl p-8">
             <div className="flex items-center justify-between">
               <div className="flex items-start space-x-4">
@@ -163,24 +236,12 @@ export default function SuppliersDashboard() {
                   </p>
                 </div>
               </div>
-              
+
               {/* Action Buttons */}
               <div className="flex flex-wrap gap-3">
-                <ActionButton 
-                  icon={Filter} 
-                  label="Filtres" 
-                  onClick={() => setIsFilterOpen(true)} 
-                />
-                <ActionButton 
-                  icon={Upload} 
-                  label="Importer" 
-                  onClick={() => setIsImportOpen(true)} 
-                />
-                <ActionButton 
-                  icon={Download} 
-                  label="Exporter" 
-                  onClick={() => setIsExportOpen(true)} 
-                />
+                <ActionButton icon={Filter} label="Filtres" onClick={() => setIsFilterOpen(true)} />
+                <ActionButton icon={Upload} label="Importer" onClick={() => setIsImportOpen(true)} />
+                <ActionButton icon={Download} label="Exporter" onClick={() => setIsExportOpen(true)} />
                 <ActionButton
                   icon={Plus}
                   label="Nouveau fournisseur"
@@ -200,8 +261,8 @@ export default function SuppliersDashboard() {
           <StatCard
             icon={<Users className="w-6 h-6 text-white" />}
             title="Total fournisseurs"
-            value="15"
-            change="+3 ce mois"
+            value={totalSuppliers.toString()}
+            change={`${activeSuppliers} actifs`}
             changeType="positive"
             gradient="from-blue-500 to-blue-600"
           />
@@ -238,25 +299,25 @@ export default function SuppliersDashboard() {
             title="Factures en attente"
             count="8"
             color="bg-blue-500"
-            onClick={() => {}}
+            onClick={() => toast.info("Fonctionnalité à venir")}
           />
           <QuickActionCard
             icon={AlertCircle}
             title="Paiements en retard"
             count="3"
             color="bg-red-500"
-            onClick={() => {}}
+            onClick={() => toast.info("Fonctionnalité à venir")}
           />
           <QuickActionCard
             icon={Package}
             title="Livraisons prévues"
             count="5"
             color="bg-green-500"
-            onClick={() => {}}
+            onClick={() => toast.info("Fonctionnalité à venir")}
           />
         </div>
 
-        {/* Charts Section */}
+        {/* Charts */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="transform hover:scale-[1.02] transition-transform duration-300">
             <SupplierStatsChart />
@@ -266,7 +327,7 @@ export default function SuppliersDashboard() {
           </div>
         </div>
 
-        {/* Main Table Section */}
+        {/* Main Table */}
         <div className="bg-white rounded-2xl border border-gray-200 shadow-xl overflow-hidden">
           <div className="bg-gradient-to-r from-gray-50 to-blue-50/30 px-8 py-6 border-b border-gray-200">
             <div className="flex items-center justify-between">
@@ -275,14 +336,24 @@ export default function SuppliersDashboard() {
                 <p className="text-sm text-gray-600">Gérez et consultez tous vos fournisseurs</p>
               </div>
               <div className="flex items-center space-x-3 px-4 py-2 bg-white rounded-xl border border-gray-200 shadow-sm">
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                <span className="text-sm font-semibold text-gray-700">15 fournisseurs actifs</span>
+                {validating ? (
+                  <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />
+                ) : (
+                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                )}
+                <span className="text-sm font-semibold text-gray-700">
+                  {totalSuppliers} fournisseur{totalSuppliers > 1 ? "s" : ""}{" "}
+                  {activeSuppliers > 0 &&
+                    `(${activeSuppliers} actif${activeSuppliers > 1 ? "s" : ""})`}
+                </span>
               </div>
             </div>
           </div>
-          
+
           <div className="p-6">
             <SupplierTable
+              suppliers={suppliersList}
+              loading={validating}
               onViewDetails={(supplier) => {
                 setSelectedSupplier(supplier);
                 setIsDetailsOpen(true);
@@ -303,6 +374,7 @@ export default function SuppliersDashboard() {
                 setSelectedSupplier(supplier);
                 setIsOrderOpen(true);
               }}
+              onRefresh={refresh}
             />
           </div>
         </div>
@@ -315,12 +387,24 @@ export default function SuppliersDashboard() {
             setSelectedSupplier(null);
           }}
           supplier={selectedSupplier}
+          onSuccess={() => {
+            refresh?.();
+            toast.success(
+              selectedSupplier
+                ? "Fournisseur modifié avec succès"
+                : "Fournisseur ajouté avec succès"
+            );
+          }}
         />
 
         <SupplierDeleteModal
           open={isDeleteOpen}
           onClose={() => setIsDeleteOpen(false)}
           supplier={selectedSupplier}
+          onSuccess={() => {
+            refresh?.();
+            toast.success("Fournisseur supprimé avec succès");
+          }}
         />
 
         <SupplierDetailsModal
@@ -341,20 +425,22 @@ export default function SuppliersDashboard() {
           supplier={selectedSupplier}
         />
 
-        <SupplierImportModal 
-          open={isImportOpen} 
-          onClose={() => setIsImportOpen(false)} 
+        <SupplierImportModal
+          open={isImportOpen}
+          onClose={() => setIsImportOpen(false)}
+          onSuccess={() => {
+            refresh?.();
+            toast.success("Fournisseurs importés avec succès");
+          }}
         />
-        
-        <SupplierExportModal 
-          open={isExportOpen} 
-          onClose={() => setIsExportOpen(false)} 
+
+        <SupplierExportModal
+          open={isExportOpen}
+          onClose={() => setIsExportOpen(false)}
+          suppliers={suppliersList}
         />
-        
-        <SupplierFilters 
-          open={isFilterOpen} 
-          onClose={() => setIsFilterOpen(false)} 
-        />
+
+        <SupplierFilters open={isFilterOpen} onClose={() => setIsFilterOpen(false)} />
       </div>
     </div>
   );

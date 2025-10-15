@@ -16,26 +16,50 @@ import {
   Box,
   Layers,
 } from "lucide-react";
+import { type Product } from "@/lib/features/sales/api";
+
+interface ProductModalProps {
+  product: Product | null;
+  onClose: () => void;
+  onEdit: (product: Product) => void;
+  onDelete: () => void;
+}
 
 export default function ProductModal({
   product,
   onClose,
   onEdit,
   onDelete,
-}) {
+}: ProductModalProps) {
   if (!product) return null;
 
+  const stockQty = parseFloat(product.stock_qty || "0");
+  const unitPrice = parseFloat(product.unit_price || "0");
+  const taxRate = parseFloat(product.tax_rate || "0");
+  const minStock = 10; // You can adjust this threshold
+  
   const mockStats = {
     totalSales: 12,
     totalDemand: 19,
-    lastMovement: "2024-09-21",
+    lastMovement: product.updated_at,
     avgMonthlyConsumption: 4,
-    lastProduction: "2024-09-15",
-    totalValue: product.stock * product.price,
+    lastProduction: product.created_at,
+    totalValue: stockQty * unitPrice,
   };
 
   const getStockStatus = () => {
-    const percentage = (product.stock / product.minStock) * 100;
+    if (!product.track_stock) {
+      return {
+        status: "N/A",
+        color: "gray",
+        icon: <Package className="w-5 h-5" />,
+        bgColor: "bg-gray-50",
+        textColor: "text-gray-700",
+        borderColor: "border-gray-200",
+      };
+    }
+
+    const percentage = (stockQty / minStock) * 100;
     if (percentage < 50)
       return {
         status: "Critique",
@@ -65,9 +89,13 @@ export default function ProductModal({
   };
 
   const stockStatus = getStockStatus();
-  const percentage = Math.round((product.stock / product.minStock) * 100);
+  const percentage = product.track_stock ? Math.round((stockQty / minStock) * 100) : 100;
 
   const salesData = [45, 52, 48, 60, 65, 70, 58, 65, 72, 68, 75, 80];
+
+  function handleDelete(event: React.MouseEvent<HTMLButtonElement>): void {
+    throw new Error("Function not implemented.");
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
@@ -95,13 +123,21 @@ export default function ProductModal({
                 <div className="flex items-center space-x-4 text-sm text-white/90">
                   <span className="flex items-center">
                     <Tag className="w-4 h-4 mr-1" />
-                    {product.reference}
+                    {product.sku}
                   </span>
                   <span>•</span>
                   <span className="flex items-center">
                     <Box className="w-4 h-4 mr-1" />
-                    {product.category}
+                    {product.type === "GOOD" ? "Bien" : "Service"}
                   </span>
+                  {!product.is_active && (
+                    <>
+                      <span>•</span>
+                      <span className="flex items-center bg-white/20 px-2 py-1 rounded">
+                        Inactif
+                      </span>
+                    </>
+                  )}
                 </div>
               </div>
               <div
@@ -112,24 +148,26 @@ export default function ProductModal({
               </div>
             </div>
 
-            <div className="bg-white/20 backdrop-blur-sm rounded-lg p-4">
-              <div className="flex items-center justify-between mb-2 text-sm">
-                <span>Stock actuel</span>
-                <span className="font-bold">
-                  {product.stock} / {product.minStock} {product.unit}
-                </span>
+            {product.track_stock && (
+              <div className="bg-white/20 backdrop-blur-sm rounded-lg p-4">
+                <div className="flex items-center justify-between mb-2 text-sm">
+                  <span>Stock actuel</span>
+                  <span className="font-bold">
+                    {stockQty} {product.unit || "unité"}
+                  </span>
+                </div>
+                <div className="w-full bg-white/30 rounded-full h-3 overflow-hidden">
+                  <div
+                    className="h-full bg-white rounded-full transition-all duration-500"
+                    style={{ width: `${Math.min(percentage, 100)}%` }}
+                  />
+                </div>
+                <div className="flex justify-between mt-2 text-xs text-white/80">
+                  <span>{percentage}% du seuil</span>
+                  <span>Valeur: {(mockStats.totalValue || 0).toLocaleString("fr-DZ")} DA</span>
+                </div>
               </div>
-              <div className="w-full bg-white/30 rounded-full h-3 overflow-hidden">
-                <div
-                  className="h-full bg-white rounded-full transition-all duration-500"
-                  style={{ width: `${Math.min(percentage, 100)}%` }}
-                />
-              </div>
-              <div className="flex justify-between mt-2 text-xs text-white/80">
-                <span>{percentage}% du minimum</span>
-                <span>Valeur: {mockStats.totalValue.toLocaleString()} DA</span>
-              </div>
-            </div>
+            )}
           </div>
         </div>
 
@@ -219,27 +257,43 @@ export default function ProductModal({
               </h3>
               <div className="space-y-3">
                 <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Référence</span>
+                  <span className="text-sm text-gray-600">Référence (SKU)</span>
                   <span className="text-sm font-medium text-gray-900">
-                    {product.reference}
+                    {product.sku}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Catégorie</span>
-                  <span className="text-sm font-medium text-gray-900 bg-green-100 px-2 py-1 rounded">
-                    {product.category}
+                  <span className="text-sm text-gray-600">Type</span>
+                  <span className={`text-sm font-medium px-2 py-1 rounded ${
+                    product.type === "GOOD" 
+                      ? "bg-blue-100 text-blue-800" 
+                      : "bg-purple-100 text-purple-800"
+                  }`}>
+                    {product.type === "GOOD" ? "Bien" : "Service"}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-sm text-gray-600">Unité</span>
                   <span className="text-sm font-medium text-gray-900">
-                    {product.unit}
+                    {product.unit || "N/A"}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Prix unitaire</span>
+                  <span className="text-sm text-gray-600">Prix unitaire HT</span>
                   <span className="text-sm font-medium text-gray-900">
-                    {product.price.toLocaleString()} DA
+                    {(unitPrice || 0).toLocaleString("fr-DZ")} DA
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-gray-600">TVA</span>
+                  <span className="text-sm font-medium text-gray-900">
+                    {taxRate}%
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-gray-600">Prix TTC</span>
+                  <span className="text-sm font-bold text-gray-900">
+                    {((unitPrice * (1 + taxRate / 100)) || 0).toLocaleString("fr-DZ")} DA
                   </span>
                 </div>
               </div>
@@ -248,54 +302,78 @@ export default function ProductModal({
             <div className="space-y-4">
               <h3 className="text-sm font-semibold text-gray-900 flex items-center border-b border-gray-200 pb-2">
                 <Layers className="w-4 h-4 mr-2 text-green-600" />
-                Production et stock
+                Stock et dates
               </h3>
               <div className="space-y-3">
                 <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Dernière production</span>
+                  <span className="text-sm text-gray-600">Suivi du stock</span>
                   <span className="text-sm font-medium text-gray-900">
-                    {new Date(mockStats.lastProduction).toLocaleDateString("fr-FR")}
+                    {product.track_stock ? "Oui" : "Non"}
+                  </span>
+                </div>
+                {product.track_stock && (
+                  <>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-gray-600">Stock actuel</span>
+                      <span className="text-sm font-medium text-gray-900">
+                        {stockQty} {product.unit || "unité"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-gray-600">Valeur totale</span>
+                      <span className="text-sm font-medium text-gray-900">
+                        {(mockStats.totalValue || 0).toLocaleString("fr-DZ")} DA
+                      </span>
+                    </div>
+                  </>
+                )}
+                <div className="flex justify-between">
+                  <span className="text-sm text-gray-600">Créé le</span>
+                  <span className="text-sm font-medium text-gray-900">
+                    {new Date(product.created_at).toLocaleDateString("fr-FR")}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Stock minimum</span>
+                  <span className="text-sm text-gray-600">Modifié le</span>
                   <span className="text-sm font-medium text-gray-900">
-                    {product.minStock} {product.unit}
+                    {new Date(product.updated_at).toLocaleDateString("fr-FR")}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Stock actuel</span>
-                  <span className="text-sm font-medium text-gray-900">
-                    {product.stock} {product.unit}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Valeur totale</span>
-                  <span className="text-sm font-medium text-gray-900">
-                    {mockStats.totalValue.toLocaleString()} DA
+                  <span className="text-sm text-gray-600">Statut</span>
+                  <span className={`text-sm font-medium px-2 py-1 rounded ${
+                    product.is_active 
+                      ? "bg-green-100 text-green-800" 
+                      : "bg-gray-100 text-gray-800"
+                  }`}>
+                    {product.is_active ? "Actif" : "Inactif"}
                   </span>
                 </div>
               </div>
             </div>
           </div>
 
+          {/* Description */}
+          {product.description && (
+            <div className="bg-gray-50 rounded-xl p-4 mb-6 border border-gray-200">
+              <h3 className="text-sm font-semibold text-gray-900 mb-2">Description</h3>
+              <p className="text-sm text-gray-700">{product.description}</p>
+            </div>
+          )}
+
           {/* Alerte stock bas */}
-          {product.stock < product.minStock && (
+          {product.track_stock && stockQty < minStock && (
             <div className="bg-red-50 border-l-4 border-red-500 rounded-lg p-4 mb-6">
               <div className="flex items-start">
-                <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 mr-3" />
+                <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 mr-3 flex-shrink-0" />
                 <div className="flex-1">
                   <h4 className="text-sm font-semibold text-red-900 mb-1">
                     Stock insuffisant
                   </h4>
                   <p className="text-sm text-red-700">
-                    Le stock actuel est inférieur au seuil minimum. Il est
-                    recommandé de lancer une production rapidement.
+                    Le stock actuel ({stockQty} {product.unit}) est inférieur au seuil recommandé ({minStock} {product.unit}). 
+                    Il est recommandé de réapprovisionner rapidement.
                   </p>
-                  <button className="mt-3 inline-flex items-center px-3 py-1.5 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors">
-                    <ShoppingCart className="w-4 h-4 mr-2" />
-                    Lancer production
-                  </button>
                 </div>
               </div>
             </div>
@@ -314,15 +392,7 @@ export default function ProductModal({
                 Modifier
               </button>
               <button
-                onClick={() => {
-                  if (
-                    window.confirm(
-                      `Êtes-vous sûr de vouloir supprimer ${product.name} ?`
-                    )
-                  ) {
-                    onDelete(product.id);
-                  }
-                }}
+                onClick={handleDelete}
                 className="inline-flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
               >
                 <Trash2 className="w-4 h-4 mr-2" />

@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   X,
   Save,
@@ -11,86 +11,120 @@ import {
   AlertCircle,
   CheckCircle,
 } from "lucide-react";
+import { type Product } from "@/lib/features/sales/api";
+
+interface ProductFormProps {
+  product: Product | null;
+  onSave: (product: Partial<Product>) => void;
+  onClose: () => void;
+}
 
 const initialState = {
   name: "",
-  reference: "",
-  category: "",
-  stock: 0,
-  minStock: 1,
-  unit: "",
-  price: 0,
+  sku: "",
+  description: "",
+  type: "GOOD" as "GOOD" | "SERVICE",
+  unit: "pièce",
+  stock_qty: "0",
+  unit_price: "0",
+  tax_rate: "19",
+  track_stock: true,
+  is_active: true,
 };
 
-export default function ProductForm({ product, onSave, onClose }) {
-  const [form, setForm] = useState(product || initialState);
-  const [errors, setErrors] = useState({});
-  const [touched, setTouched] = useState({});
+export default function ProductForm({ product, onSave, onClose }: ProductFormProps) {
+  const [form, setForm] = useState(initialState);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
 
-  const categories = ["Affichage", "Impression", "Signalétique", "Décoration", "Autre"];
-  const units = ["pièce", "mètre", "paquet", "boîte", "rouleau"];
+  const types = [
+    { value: "GOOD", label: "Bien" },
+    { value: "SERVICE", label: "Service" },
+  ];
+  const units = ["pièce", "mètre", "paquet", "boîte", "rouleau", "kg", "litre"];
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setForm((prev) => ({
-      ...prev,
-      [name]:
-        name === "stock" || name === "minStock" || name === "price"
-          ? Number(value)
-          : value,
-    }));
+  useEffect(() => {
+    if (product) {
+      setForm({
+        name: product.name || "",
+        sku: product.sku || "",
+        description: product.description || "",
+        type: product.type || "GOOD",
+        unit: product.unit || "pièce",
+        stock_qty: product.stock_qty || "0",
+        unit_price: product.unit_price || "0",
+        tax_rate: product.tax_rate || "19",
+        track_stock: product.track_stock ?? true,
+        is_active: product.is_active ?? true,
+      });
+    }
+  }, [product]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const { name, value, type } = e.target;
+    
+    if (type === "checkbox") {
+      const checked = (e.target as HTMLInputElement).checked;
+      setForm((prev) => ({ ...prev, [name]: checked }));
+    } else {
+      setForm((prev) => ({ ...prev, [name]: value }));
+    }
     
     if (errors[name]) {
       setErrors((prev) => ({ ...prev, [name]: "" }));
     }
   };
 
-  const handleBlur = (field) => {
+  const handleBlur = (field: string) => {
     setTouched((prev) => ({ ...prev, [field]: true }));
     validateField(field);
   };
 
-  const validateField = (field) => {
+  const validateField = (field: string) => {
     const newErrors = { ...errors };
 
     switch (field) {
       case "name":
-        if (!form.name.trim()) {
+        if (!form.name || !form.name.trim()) {
           newErrors.name = "Le nom est obligatoire";
-        } else if (form.name.length < 3) {
+        } else if (form.name.trim().length < 3) {
           newErrors.name = "Le nom doit contenir au moins 3 caractères";
         } else {
           delete newErrors.name;
         }
         break;
-      case "reference":
-        if (!form.reference.trim()) {
-          newErrors.reference = "La référence est obligatoire";
+      case "sku":
+        if (!form.sku || !form.sku.trim()) {
+          newErrors.sku = "La référence est obligatoire";
         } else {
-          delete newErrors.reference;
+          delete newErrors.sku;
         }
         break;
-      case "stock":
-        if (form.stock < 0) {
-          newErrors.stock = "Le stock ne peut pas être négatif";
+      case "stock_qty":
+        if (form.track_stock) {
+          const qty = parseFloat(form.stock_qty);
+          if (isNaN(qty) || qty < 0) {
+            newErrors.stock_qty = "Le stock ne peut pas être négatif";
+          } else {
+            delete newErrors.stock_qty;
+          }
         } else {
-          delete newErrors.stock;
+          delete newErrors.stock_qty;
         }
         break;
-      case "minStock":
-        if (form.minStock < 0) {
-          newErrors.minStock = "Le stock minimum ne peut pas être négatif";
-        } else if (form.minStock === 0) {
-          newErrors.minStock = "Le stock minimum doit être supérieur à 0";
+      case "unit_price":
+        const price = parseFloat(form.unit_price);
+        if (isNaN(price) || price < 0) {
+          newErrors.unit_price = "Le prix ne peut pas être négatif";
         } else {
-          delete newErrors.minStock;
+          delete newErrors.unit_price;
         }
         break;
-      case "price":
-        if (form.price < 0) {
-          newErrors.price = "Le prix ne peut pas être négatif";
+      case "unit":
+        if (!form.unit || !form.unit.trim()) {
+          newErrors.unit = "L'unité est obligatoire";
         } else {
-          delete newErrors.price;
+          delete newErrors.unit;
         }
         break;
     }
@@ -100,7 +134,7 @@ export default function ProductForm({ product, onSave, onClose }) {
   };
 
   const validateForm = () => {
-    const fields = ["name", "reference", "stock", "minStock", "price"];
+    const fields = ["name", "sku", "unit", "stock_qty", "unit_price"];
     let isValid = true;
 
     fields.forEach((field) => {
@@ -112,10 +146,10 @@ export default function ProductForm({ product, onSave, onClose }) {
     return isValid;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    const allTouched = {};
+    const allTouched: Record<string, boolean> = {};
     Object.keys(form).forEach((key) => {
       allTouched[key] = true;
     });
@@ -125,7 +159,20 @@ export default function ProductForm({ product, onSave, onClose }) {
       return;
     }
 
-    onSave(form);
+    const payload: Partial<Product> = {
+      name: form.name.trim(),
+      sku: form.sku.trim(),
+      description: form.description?.trim() || "",
+      type: form.type,
+      unit: form.unit.trim(),
+      unit_price: form.unit_price,
+      stock_qty: form.stock_qty,
+      tax_rate: form.tax_rate,
+      track_stock: form.track_stock,
+      is_active: form.is_active,
+    };
+
+    onSave(payload);
   };
 
   const InputField = ({
@@ -136,10 +183,21 @@ export default function ProductForm({ product, onSave, onClose }) {
     required = false,
     placeholder = "",
     min,
+    max,
     step,
+  }: {
+    label: string;
+    name: string;
+    type?: string;
+    icon?: React.ElementType;
+    required?: boolean;
+    placeholder?: string;
+    min?: number | string;
+    max?: number | string;
+    step?: string;
   }) => {
     const hasError = touched[name] && errors[name];
-    const isValid = touched[name] && !errors[name] && form[name];
+    const isValid = touched[name] && !errors[name] && form[name as keyof typeof form];
 
     return (
       <div>
@@ -156,10 +214,11 @@ export default function ProductForm({ product, onSave, onClose }) {
           <input
             type={type}
             name={name}
-            value={form[name]}
+            value={form[name as keyof typeof form] as string}
             onChange={handleChange}
             onBlur={() => handleBlur(name)}
             min={min}
+            max={max}
             step={step}
             placeholder={placeholder}
             className={`w-full ${Icon ? "pl-10" : "pl-4"} pr-10 py-3 border rounded-lg focus:ring-2 focus:outline-none transition-all ${
@@ -198,6 +257,12 @@ export default function ProductForm({ product, onSave, onClose }) {
     options,
     icon: Icon,
     required = false,
+  }: {
+    label: string;
+    name: string;
+    options: string[] | { value: string; label: string }[];
+    icon?: React.ElementType;
+    required?: boolean;
   }) => {
     return (
       <div>
@@ -213,17 +278,21 @@ export default function ProductForm({ product, onSave, onClose }) {
           )}
           <select
             name={name}
-            value={form[name]}
+            value={form[name as keyof typeof form] as string}
             onChange={handleChange}
             className={`w-full ${Icon ? "pl-10" : "pl-4"} pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-200 focus:border-green-500 focus:outline-none appearance-none bg-white cursor-pointer transition-all`}
             required={required}
           >
             <option value="">-- Choisir --</option>
-            {options.map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))}
+            {options.map((option) => {
+              const value = typeof option === "string" ? option : option.value;
+              const label = typeof option === "string" ? option : option.label;
+              return (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              );
+            })}
           </select>
           <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
             <svg
@@ -245,13 +314,44 @@ export default function ProductForm({ product, onSave, onClose }) {
     );
   };
 
-  const stockPercentage = form.minStock > 0 ? (form.stock / form.minStock) * 100 : 0;
+  const TextAreaField = ({
+    label,
+    name,
+    placeholder = "",
+  }: {
+    label: string;
+    name: string;
+    placeholder?: string;
+  }) => {
+    return (
+      <div>
+        <label className="block text-sm font-semibold text-gray-700 mb-2">
+          {label}
+        </label>
+        <textarea
+          name={name}
+          value={form[name as keyof typeof form] as string}
+          onChange={handleChange}
+          rows={3}
+          placeholder={placeholder}
+          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-200 focus:border-green-500 focus:outline-none transition-all"
+        />
+      </div>
+    );
+  };
+
+  const minStock = 10; // You can make this configurable
+  const stockQty = parseFloat(form.stock_qty || "0");
+  const stockPercentage = minStock > 0 ? (stockQty / minStock) * 100 : 0;
   const stockStatus =
     stockPercentage < 50
       ? { color: "red", text: "Critique" }
       : stockPercentage < 100
       ? { color: "orange", text: "Bas" }
       : { color: "green", text: "Normal" };
+
+  const unitPrice = parseFloat(form.unit_price || "0");
+  const totalValue = stockQty * unitPrice;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
@@ -281,8 +381,8 @@ export default function ProductForm({ product, onSave, onClose }) {
             </div>
             <p className="text-white/80 text-sm">
               {product
-                ? "Modifiez les informations du produit fini"
-                : "Remplissez les informations du nouveau produit fini"}
+                ? "Modifiez les informations du produit"
+                : "Remplissez les informations du nouveau produit"}
             </p>
           </div>
         </div>
@@ -305,25 +405,34 @@ export default function ProductForm({ product, onSave, onClose }) {
                   placeholder="Ex: Roll-up Publicitaire"
                 />
                 <InputField
-                  label="Référence"
-                  name="reference"
+                  label="Référence (SKU)"
+                  name="sku"
                   icon={Tag}
                   required
                   placeholder="Ex: PR-001"
                 />
               </div>
+              <div className="mt-4">
+                <TextAreaField
+                  label="Description"
+                  name="description"
+                  placeholder="Description détaillée du produit..."
+                />
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                 <SelectField
-                  label="Catégorie"
-                  name="category"
-                  options={categories}
+                  label="Type"
+                  name="type"
+                  options={types}
                   icon={Box}
+                  required
                 />
                 <SelectField
                   label="Unité de mesure"
                   name="unit"
                   options={units}
                   icon={Box}
+                  required
                 />
               </div>
             </div>
@@ -334,55 +443,67 @@ export default function ProductForm({ product, onSave, onClose }) {
                 <TrendingUp className="w-5 h-5 mr-2 text-green-600" />
                 Stock et inventaire
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <InputField
-                  label="Stock actuel"
-                  name="stock"
-                  type="number"
-                  icon={Package}
-                  required
-                  min={0}
-                  placeholder="0"
-                />
-                <InputField
-                  label="Stock minimum"
-                  name="minStock"
-                  type="number"
-                  icon={AlertCircle}
-                  required
-                  min={1}
-                  placeholder="1"
-                />
+              
+              <div className="mb-4">
+                <label className="flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    name="track_stock"
+                    checked={form.track_stock}
+                    onChange={handleChange}
+                    className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
+                  />
+                  <span className="ml-2 text-sm font-medium text-gray-700">
+                    Suivre le stock de ce produit
+                  </span>
+                </label>
               </div>
 
-              {/* Indicateur visuel du stock */}
-              {form.stock > 0 && form.minStock > 0 && (
-                <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-gray-700">
-                      Niveau de stock
-                    </span>
-                    <span
-                      className={`text-sm font-semibold px-2 py-1 rounded bg-${stockStatus.color}-100 text-${stockStatus.color}-700`}
-                    >
-                      {stockStatus.text}
-                    </span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
-                    <div
-                      className={`h-full bg-${stockStatus.color}-500 transition-all duration-500 rounded-full`}
-                      style={{
-                        width: `${Math.min(stockPercentage, 100)}%`,
-                      }}
+              {form.track_stock && (
+                <>
+                  <div className="grid grid-cols-1 gap-4">
+                    <InputField
+                      label="Stock actuel"
+                      name="stock_qty"
+                      type="number"
+                      icon={Package}
+                      required
+                      min={0}
+                      step="0.01"
+                      placeholder="0"
                     />
                   </div>
-                  <div className="flex justify-between mt-1 text-xs text-gray-500">
-                    <span>
-                      {form.stock} {form.unit || "unité(s)"}
-                    </span>
-                    <span>{Math.round(stockPercentage)}%</span>
-                  </div>
-                </div>
+
+                  {/* Indicateur visuel du stock */}
+                  {stockQty > 0 && (
+                    <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-medium text-gray-700">
+                          Niveau de stock
+                        </span>
+                        <span
+                          className={`text-sm font-semibold px-2 py-1 rounded bg-${stockStatus.color}-100 text-${stockStatus.color}-700`}
+                        >
+                          {stockStatus.text}
+                        </span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                        <div
+                          className={`h-full bg-${stockStatus.color}-500 transition-all duration-500 rounded-full`}
+                          style={{
+                            width: `${Math.min(stockPercentage, 100)}%`,
+                          }}
+                        />
+                      </div>
+                      <div className="flex justify-between mt-1 text-xs text-gray-500">
+                        <span>
+                          {stockQty} {form.unit || "unité(s)"}
+                        </span>
+                        <span>{Math.round(stockPercentage)}%</span>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </div>
 
@@ -395,26 +516,53 @@ export default function ProductForm({ product, onSave, onClose }) {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <InputField
                   label="Prix unitaire (DA)"
-                  name="price"
+                  name="unit_price"
                   type="number"
                   icon={DollarSign}
                   min={0}
-                  step={0.01}
+                  step="0.01"
                   placeholder="0.00"
+                  required
                 />
-                {form.price > 0 && form.stock > 0 && (
-                  <div className="flex items-end">
-                    <div className="w-full p-4 bg-green-50 border border-green-200 rounded-lg">
-                      <p className="text-sm text-gray-600 mb-1">
-                        Valeur totale du stock
-                      </p>
-                      <p className="text-2xl font-bold text-green-600">
-                        {(form.price * form.stock).toLocaleString()} DA
-                      </p>
-                    </div>
-                  </div>
-                )}
+                <InputField
+                  label="Taux de TVA (%)"
+                  name="tax_rate"
+                  type="number"
+                  icon={DollarSign}
+                  min={0}
+                  max={100}
+                  step="0.01"
+                  placeholder="19"
+                />
               </div>
+              {unitPrice > 0 && stockQty > 0 && form.track_stock && (
+                <div className="mt-4">
+                  <div className="w-full p-4 bg-green-50 border border-green-200 rounded-lg">
+                    <p className="text-sm text-gray-600 mb-1">
+                      Valeur totale du stock
+                    </p>
+                    <p className="text-2xl font-bold text-green-600">
+                      {totalValue.toLocaleString("fr-DZ")} DA
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Section: Statut */}
+            <div>
+              <label className="flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  name="is_active"
+                  checked={form.is_active}
+                  onChange={handleChange}
+                  className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
+                />
+                <span className="ml-2 text-sm font-medium text-gray-700">
+                  Produit actif
+                </span>
+              </label>
             </div>
           </div>
 

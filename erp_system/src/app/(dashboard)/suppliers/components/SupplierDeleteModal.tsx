@@ -6,6 +6,7 @@ interface SupplierDeleteModalProps {
   open: boolean;
   onClose: () => void;
   supplier?: any;
+  onSuccess?: (deleted?: any) => void;
 }
 
 export default function SupplierDeleteModal({

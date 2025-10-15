@@ -51,6 +51,7 @@ export type Activity = {
 };
 
 export type ClientMini = {
+  revenue: number;
   id: string;
   firstName?: string;
   lastName?: string;

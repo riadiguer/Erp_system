@@ -26,6 +26,8 @@ export const MENU: MenuItem[] = [
     children: [
       { label: "Orders", href: "/sales/orders", need: ["sales_view"] },
       { label: "Invoices", href: "/sales/invoices", need: ["invoices_view"] },
+      { label: "Quotes", href: "/sales/quotes", need: ["sales_view"] },
+      { label: "Delivery Notes", href: "/sales/delivery-notes", need: ["sales_view"] },
     ],
   },
   {

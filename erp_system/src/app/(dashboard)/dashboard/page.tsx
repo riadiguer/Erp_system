@@ -10,7 +10,23 @@ import {
 } from 'lucide-react'
 
 // Enhanced StatCard Component
-function StatCard({ icon, label, value, trend, color, subtitle, actionLabel }) {
+function StatCard({
+  icon,
+  label,
+  value,
+  trend,
+  color,
+  subtitle,
+  actionLabel
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string | number;
+  trend: number;
+  color: string;
+  subtitle?: string;
+  actionLabel?: string;
+}) {
   const isPositive = trend > 0
   
   return (
@@ -42,7 +58,19 @@ function StatCard({ icon, label, value, trend, color, subtitle, actionLabel }) {
 }
 
 // Enhanced Shortcut Component
-function QuickAction({ icon, label, color, onClick, badge }) {
+function QuickAction({
+  icon,
+  label,
+  color,
+  onClick,
+  badge
+}: {
+  icon: React.ReactNode;
+  label: string;
+  color: string;
+  onClick?: () => void;
+  badge?: string | number;
+}) {
   return (
     <button
       className={`relative group flex flex-col items-center justify-center p-4 rounded-2xl border border-gray-100 bg-white hover:shadow-lg transition-all duration-300 hover:-translate-y-1 ${color}`}
@@ -62,7 +90,17 @@ function QuickAction({ icon, label, color, onClick, badge }) {
 }
 
 // Notification Component
-function NotificationCard({ type, message, time, priority = 'normal' }) {
+function NotificationCard({
+  type,
+  message,
+  time,
+  priority = 'normal'
+}: {
+  type: string;
+  message: string;
+  time: string;
+  priority?: 'high' | 'normal' | 'low';
+}) {
   const priorityColors = {
     high: 'border-red-200 bg-red-50',
     normal: 'border-blue-200 bg-blue-50',
@@ -87,7 +125,7 @@ function NotificationCard({ type, message, time, priority = 'normal' }) {
 }
 
 // Chart Placeholder Component
-function ChartPlaceholder({ title, icon, type = 'line' }) {
+function ChartPlaceholder({ title, icon, type = 'line' }: { title: string; icon: React.ReactNode; type?: string }) {
   return (
     <div className="bg-white rounded-2xl border border-gray-100 p-6 hover:shadow-lg transition-shadow">
       <div className="flex items-center justify-between mb-6">
@@ -114,7 +152,21 @@ function ChartPlaceholder({ title, icon, type = 'line' }) {
 }
 
 // Recent Activity Item
-function ActivityItem({ icon, title, subtitle, time, amount, status }) {
+function ActivityItem({
+  icon,
+  title,
+  subtitle,
+  time,
+  amount,
+  status
+}: {
+  icon: React.ReactNode;
+  title: string;
+  subtitle: string;
+  time: string;
+  amount?: string;
+  status: 'success' | 'pending' | 'failed';
+}) {
   const statusColors = {
     success: 'text-emerald-600 bg-emerald-50',
     pending: 'text-orange-600 bg-orange-50',
@@ -346,7 +398,11 @@ export default function DashboardPage() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {notifications.map((notification, i) => (
-              <NotificationCard key={i} {...notification} />
+              <NotificationCard
+                key={i}
+                {...notification}
+                priority={notification.priority as 'high' | 'normal' | 'low'}
+              />
             ))}
           </div>
         </div>
@@ -382,7 +438,7 @@ export default function DashboardPage() {
             </div>
             <div className="space-y-2">
               {recentActivities.map((activity, i) => (
-                <ActivityItem key={i} {...activity} />
+                <ActivityItem key={i} {...activity} status={activity.status as "success" | "pending" | "failed"} />
               ))}
             </div>
           </div>

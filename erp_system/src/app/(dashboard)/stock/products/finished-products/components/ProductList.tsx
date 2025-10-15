@@ -1,10 +1,9 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { 
   Eye, 
   Edit, 
   Trash2, 
-  ShoppingCart, 
   Package, 
   AlertCircle,
   CheckCircle,
@@ -12,6 +11,15 @@ import {
   List,
   DollarSign
 } from "lucide-react";
+import { type Product } from "@/lib/features/sales/api";
+
+interface ProductListProps {
+  products: Product[];
+  searchTerm: string;
+  onViewDetails: (product: Product) => void;
+  onEdit: (product: Product) => void;
+  onDelete: (productId: string) => void;
+}
 
 export default function ProductList({
   products,
@@ -19,40 +27,62 @@ export default function ProductList({
   onViewDetails,
   onEdit,
   onDelete,
-}) {
-  const [filterCategory, setFilterCategory] = useState("");
-  const [viewMode, setViewMode] = useState("grid");
+}: ProductListProps) {
+  const [filterType, setFilterType] = useState<"" | "GOOD" | "SERVICE">("");
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
-  const filteredProducts = products.filter((product) => {
-    const matchesSearch =
-      product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      product.reference.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = filterCategory
-      ? product.category === filterCategory
-      : true;
-    return matchesSearch && matchesCategory;
-  });
+  // Filter products
+  const filteredProducts = useMemo(() => {
+    return products.filter((product) => {
+      const matchesSearch =
+        product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        product.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (product.description && product.description.toLowerCase().includes(searchTerm.toLowerCase()));
+      const matchesType = filterType ? product.type === filterType : true;
+      return matchesSearch && matchesType;
+    });
+  }, [products, searchTerm, filterType]);
 
-  const categories = Array.from(new Set(products.map((p) => p.category)));
+  // Get unique product types
+  const productTypes = useMemo(() => {
+    return Array.from(new Set(products.map((p) => p.type)));
+  }, [products]);
 
-  const getStockStatus = (stock, minStock) => {
-    const percentage = (stock / minStock) * 100;
-    if (percentage < 50) return { 
-      status: "Critique", 
-      color: "red", 
-      icon: <AlertCircle className="w-4 h-4" />,
-      bgColor: "bg-red-50",
-      borderColor: "border-red-200",
-      textColor: "text-red-700"
-    };
-    if (percentage < 100) return { 
-      status: "Bas", 
-      color: "orange", 
-      icon: <AlertCircle className="w-4 h-4" />,
-      bgColor: "bg-orange-50",
-      borderColor: "border-orange-200",
-      textColor: "text-orange-700"
-    };
+  const getStockStatus = (stockQty: string, trackStock: boolean) => {
+    if (!trackStock) {
+      return {
+        status: "N/A",
+        color: "gray",
+        icon: <Package className="w-4 h-4" />,
+        bgColor: "bg-gray-50",
+        borderColor: "border-gray-200",
+        textColor: "text-gray-700"
+      };
+    }
+
+    const stock = parseFloat(stockQty);
+    const minStock = 10; // You can adjust this threshold
+
+    if (stock < minStock * 0.5) {
+      return { 
+        status: "Critique", 
+        color: "red", 
+        icon: <AlertCircle className="w-4 h-4" />,
+        bgColor: "bg-red-50",
+        borderColor: "border-red-200",
+        textColor: "text-red-700"
+      };
+    }
+    if (stock < minStock) {
+      return { 
+        status: "Bas", 
+        color: "orange", 
+        icon: <AlertCircle className="w-4 h-4" />,
+        bgColor: "bg-orange-50",
+        borderColor: "border-orange-200",
+        textColor: "text-orange-700"
+      };
+    }
     return { 
       status: "Normal", 
       color: "green", 
@@ -66,8 +96,12 @@ export default function ProductList({
   const GridView = () => (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       {filteredProducts.map((product) => {
-        const stockStatus = getStockStatus(product.stock, product.minStock);
-        const percentage = Math.round((product.stock / product.minStock) * 100);
+        const stockStatus = getStockStatus(product.stock_qty, product.track_stock);
+        const stockQty = parseFloat(product.stock_qty);
+        const unitPrice = parseFloat(product.unit_price);
+        const totalValue = stockQty * unitPrice;
+        const minStock = 10; // Adjust threshold
+        const percentage = product.track_stock ? Math.round((stockQty / minStock) * 100) : 100;
 
         return (
           <div
@@ -84,7 +118,7 @@ export default function ProductList({
                     <h3 className="font-semibold text-gray-900 truncate group-hover:text-green-600 transition-colors">
                       {product.name}
                     </h3>
-                    <p className="text-sm text-gray-500">{product.reference}</p>
+                    <p className="text-sm text-gray-500">{product.sku}</p>
                   </div>
                 </div>
                 <span className={`inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full ${stockStatus.bgColor} ${stockStatus.textColor} border ${stockStatus.borderColor}`}>
@@ -97,44 +131,56 @@ export default function ProductList({
             <div className="p-4">
               <div className="space-y-3 mb-4">
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-600">Catégorie</span>
-                  <span className="font-medium text-gray-900 bg-gray-100 px-2 py-1 rounded">
-                    {product.category}
+                  <span className="text-gray-600">Type</span>
+                  <span className={`font-medium px-2 py-1 rounded ${
+                    product.type === "GOOD" 
+                      ? "bg-blue-100 text-blue-800" 
+                      : "bg-purple-100 text-purple-800"
+                  }`}>
+                    {product.type === "GOOD" ? "Bien" : "Service"}
                   </span>
                 </div>
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-gray-600">Prix unitaire</span>
                   <span className="font-medium text-gray-900 flex items-center">
                     <DollarSign className="w-4 h-4 mr-1" />
-                    {product.price.toLocaleString()} DA
+                    {unitPrice.toLocaleString("fr-DZ")} DA
                   </span>
                 </div>
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-gray-600">Unité</span>
                   <span className="font-medium text-gray-900">{product.unit}</span>
                 </div>
-              </div>
-
-              <div className="mb-4">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-gray-700">Stock actuel</span>
-                  <span className="text-sm font-bold text-gray-900">
-                    {product.stock} / {product.minStock} {product.unit}
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-600">Valeur stock</span>
+                  <span className="font-medium text-gray-900">
+                    {totalValue.toLocaleString("fr-DZ")} DA
                   </span>
                 </div>
-                <div className="relative">
-                  <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
-                    <div
-                      className={`h-full bg-${stockStatus.color}-500 transition-all duration-500 rounded-full`}
-                      style={{ width: `${Math.min(percentage, 100)}%` }}
-                    />
+              </div>
+
+              {product.track_stock && (
+                <div className="mb-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium text-gray-700">Stock actuel</span>
+                    <span className="text-sm font-bold text-gray-900">
+                      {stockQty} {product.unit}
+                    </span>
                   </div>
-                  <div className="flex justify-between mt-1">
-                    <span className="text-xs text-gray-500">{percentage}%</span>
-                    <span className="text-xs text-gray-500">du minimum</span>
+                  <div className="relative">
+                    <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                      <div
+                        className={`h-full bg-${stockStatus.color}-500 transition-all duration-500 rounded-full`}
+                        style={{ width: `${Math.min(percentage, 100)}%` }}
+                      />
+                    </div>
+                    <div className="flex justify-between mt-1">
+                      <span className="text-xs text-gray-500">{percentage}%</span>
+                      <span className="text-xs text-gray-500">du seuil</span>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
 
               <div className="flex items-center gap-2 pt-4 border-t border-gray-100">
                 <button
@@ -166,18 +212,6 @@ export default function ProductList({
                 </button>
               </div>
             </div>
-
-            {product.stock < product.minStock && (
-              <div className="px-4 py-3 bg-gray-50 border-t border-gray-100">
-                <button
-                  className="w-full flex items-center justify-center px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
-                  onClick={() => alert("Demande de production à implémenter")}
-                >
-                  <ShoppingCart className="w-4 h-4 mr-2" />
-                  Lancer production
-                </button>
-              </div>
-            )}
           </div>
         );
       })}
@@ -194,7 +228,7 @@ export default function ProductList({
                 Produit
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Catégorie
+                Type
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Prix
@@ -212,7 +246,11 @@ export default function ProductList({
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {filteredProducts.map((product) => {
-              const stockStatus = getStockStatus(product.stock, product.minStock);
+              const stockStatus = getStockStatus(product.stock_qty, product.track_stock);
+              const stockQty = parseFloat(product.stock_qty);
+              const unitPrice = parseFloat(product.unit_price);
+              const minStock = 10;
+              const percentage = product.track_stock ? (stockQty / minStock) * 100 : 100;
               
               return (
                 <tr key={product.id} className="hover:bg-gray-50 transition-colors">
@@ -223,32 +261,38 @@ export default function ProductList({
                       </div>
                       <div className="ml-3">
                         <div className="text-sm font-medium text-gray-900">{product.name}</div>
-                        <div className="text-sm text-gray-500">{product.reference}</div>
+                        <div className="text-sm text-gray-500">{product.sku}</div>
                       </div>
                     </div>
                   </td>
                   
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="text-sm text-gray-900 bg-gray-100 px-2 py-1 rounded">
-                      {product.category}
+                    <span className={`text-sm px-2 py-1 rounded ${
+                      product.type === "GOOD" 
+                        ? "bg-blue-100 text-blue-800" 
+                        : "bg-purple-100 text-purple-800"
+                    }`}>
+                      {product.type === "GOOD" ? "Bien" : "Service"}
                     </span>
                   </td>
                   
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    {product.price.toLocaleString()} DA
+                    {unitPrice.toLocaleString("fr-DZ")} DA
                   </td>
                   
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm">
                       <div className="font-medium text-gray-900">
-                        {product.stock} / {product.minStock} {product.unit}
+                        {stockQty} {product.unit}
                       </div>
-                      <div className="w-24 bg-gray-200 rounded-full h-1.5 mt-1">
-                        <div
-                          className={`h-full bg-${stockStatus.color}-500 rounded-full`}
-                          style={{ width: `${Math.min((product.stock / product.minStock) * 100, 100)}%` }}
-                        />
-                      </div>
+                      {product.track_stock && (
+                        <div className="w-24 bg-gray-200 rounded-full h-1.5 mt-1">
+                          <div
+                            className={`h-full bg-${stockStatus.color}-500 rounded-full`}
+                            style={{ width: `${Math.min(percentage, 100)}%` }}
+                          />
+                        </div>
+                      )}
                     </div>
                   </td>
                   
@@ -303,13 +347,13 @@ export default function ProductList({
         <div className="flex items-center gap-3">
           <select
             className="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-green-500"
-            value={filterCategory}
-            onChange={(e) => setFilterCategory(e.target.value)}
+            value={filterType}
+            onChange={(e) => setFilterType(e.target.value as "" | "GOOD" | "SERVICE")}
           >
-            <option value="">Toutes catégories</option>
-            {categories.map((cat) => (
-              <option key={cat} value={cat}>
-                {cat}
+            <option value="">Tous les types</option>
+            {productTypes.map((type) => (
+              <option key={type} value={type}>
+                {type === "GOOD" ? "Biens" : "Services"}
               </option>
             ))}
           </select>
@@ -352,7 +396,7 @@ export default function ProductList({
             Aucun produit trouvé
           </h3>
           <p className="text-gray-500">
-            {searchTerm || filterCategory
+            {searchTerm || filterType
               ? "Essayez de modifier vos critères de recherche."
               : "Commencez par ajouter votre premier produit fini."}
           </p>

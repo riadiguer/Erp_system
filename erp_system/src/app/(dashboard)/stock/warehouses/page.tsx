@@ -4,8 +4,7 @@ import {
   Package, 
   Plus, 
   Search, 
-  AlertTriangle, 
-  TrendingDown,
+  AlertTriangle,
   Boxes,
   ShoppingBag,
   Archive
@@ -14,56 +13,20 @@ import WarehouseList from "./components/WarehouseList";
 import WarehouseModal from "./components/WarehouseModal";
 import WarehouseForm from "./components/WarehouseForm";
 import StockAlert from "./components/StockAlert";
+import { WarehouseApi, type Material } from "@/lib/features/warehouse/api";
+import { useMaterials, useDashboard } from "@/lib/features/warehouse/hooks";
+import { toast } from "sonner"; // ou votre système de notification
 
-// Exemples de matières premières (mock)
-const mockMaterials = [
-  {
-    id: 1,
-    name: "Bâche PVC 450g",
-    reference: "MP-001",
-    stock: 75,
-    minStock: 50,
-    unit: "mètre",
-    supplier: "Plastico",
-    category: "Support d'impression",
-    price: 12.50,
-  },
-  {
-    id: 2,
-    name: "Adhésif polymère",
-    reference: "MP-002",
-    stock: 10,
-    minStock: 20,
-    unit: "rouleau",
-    supplier: "StickerPro",
-    category: "Vinyle",
-    price: 8.30,
-  },
-  {
-    id: 3,
-    name: "Encre UV Cyan",
-    reference: "MP-003",
-    stock: 45,
-    minStock: 30,
-    unit: "litre",
-    supplier: "InkMaster",
-    category: "Encres",
-    price: 25.00,
-  },
-  {
-    id: 4,
-    name: "Vinyle adhésif blanc",
-    reference: "MP-004",
-    stock: 120,
-    minStock: 100,
-    unit: "mètre",
-    supplier: "VinylPro",
-    category: "Vinyle",
-    price: 6.80,
-  },
-];
+interface StatCardProps {
+  icon: React.ReactElement;
+  title: string;
+  value: string | number;
+  subtitle?: string;
+  bgColor: string;
+  iconColor: string;
+}
 
-const StatCard = ({ icon, title, value, subtitle, bgColor, iconColor }) => (
+const StatCard = ({ icon, title, value, subtitle, bgColor, iconColor }: StatCardProps) => (
   <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
     <div className="flex items-center justify-between">
       <div>
@@ -74,58 +37,154 @@ const StatCard = ({ icon, title, value, subtitle, bgColor, iconColor }) => (
         )}
       </div>
       <div className={`p-3 rounded-full ${bgColor}`}>
-        {React.cloneElement(icon, { className: `w-6 h-6 ${iconColor}` })}
+        <div className={`w-6 h-6 ${iconColor}`}>
+          {icon}
+        </div>
       </div>
     </div>
   </div>
 );
 
 export default function WarehousesPage() {
-  const [materials, setMaterials] = useState(mockMaterials);
-  const [selectedMaterial, setSelectedMaterial] = useState(null);
+  // Utilisation des hooks pour récupérer les données
+  const { materials, loading, error, refresh } = useMaterials();
+  const { stats } = useDashboard();
+  
+  const [selectedMaterial, setSelectedMaterial] = useState<Material | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
 
   // --- Handlers ---
-  const handleViewDetails = (mat) => {
+  const handleViewDetails = (mat: Material) => {
     setSelectedMaterial(mat);
     setShowModal(true);
   };
 
-  const handleEdit = (mat) => {
+  const handleEdit = (mat: Material) => {
     setSelectedMaterial(mat);
     setShowForm(true);
   };
 
-  const handleDelete = (matId) => {
-    setMaterials(materials.filter((m) => m.id !== matId));
+const handleDelete = async (matId: number) => {
+  if (!confirm("Êtes-vous sûr de vouloir supprimer cette matière ?")) {
+    return;
+  }
+  
+  try {
+    await WarehouseApi.materials.remove(matId);
+    toast.success("Matière supprimée avec succès");
+    refresh(); // Rafraîchir la liste
     setShowModal(false);
-  };
+  } catch (err: any) {
+    console.error("Erreur complète:", err);
+    
+    let errorMessage = "Erreur lors de la suppression";
+    if (err.detail) {
+      errorMessage = err.detail;
+    }
+    
+    toast.error(errorMessage);
+  }
+};
 
   const handleAddMaterial = () => {
     setSelectedMaterial(null);
     setShowForm(true);
   };
 
-  const handleSaveMaterial = (mat) => {
+const handleSaveMaterial = async (mat: any) => {
+  console.log("=== DEBUT handleSaveMaterial ===");
+  console.log("Données envoyées:", mat);
+  console.log("ID présent?", !!mat.id);
+  
+  try {
+    let result;
     if (mat.id) {
-      // Update existing
-      setMaterials(materials.map((m) => (m.id === mat.id ? mat : m)));
+      console.log("Mode: UPDATE, ID:", mat.id);
+      result = await WarehouseApi.materials.update(mat.id, mat);
+      console.log("Résultat update:", result);
+      toast.success("Matière modifiée avec succès");
     } else {
-      // Add new
-      setMaterials([
-        ...materials,
-        { ...mat, id: Math.max(...materials.map(m => m.id)) + 1 },
-      ]);
+      console.log("Mode: CREATE");
+      result = await WarehouseApi.materials.create(mat);
+      console.log("Résultat create:", result);
+      toast.success("Matière ajoutée avec succès");
     }
+    
+    console.log("Appel refresh...");
+    await refresh(); // Rafraîchir la liste
+    console.log("Fermeture form...");
     setShowForm(false);
-  };
+    console.log("=== FIN handleSaveMaterial SUCCESS ===");
+  } catch (err: any) {
+    console.error("=== ERREUR CAPTURÉE ===");
+    console.error("Type:", typeof err);
+    console.error("Erreur complète:", err);
+    console.error("err.status:", err?.status);
+    console.error("err.detail:", err?.detail);
+    console.error("err.message:", err?.message);
+    console.error("Object.keys:", Object.keys(err || {}));
+    console.error("JSON.stringify:", JSON.stringify(err, null, 2));
+    
+    let errorMessage = "Erreur lors de l'enregistrement";
+    
+    if (err?.detail) {
+      errorMessage = err.detail;
+    } else if (err?.message) {
+      errorMessage = err.message;
+    } else if (err?.status) {
+      errorMessage = `Erreur ${err.status}`;
+    }
+    
+    // Afficher les erreurs de validation
+    if (err?.errors) {
+      console.error("Erreurs de validation:", err.errors);
+      const errors = Object.entries(err.errors)
+        .map(([field, msgs]) => `${field}: ${(msgs as string[]).join(', ')}`)
+        .join('\n');
+      errorMessage = errors || errorMessage;
+    }
+    
+    toast.error(errorMessage);
+    console.error("=== FIN handleSaveMaterial ERROR ===");
+  }
+};
 
-  // Calculs pour les statistiques
-  const lowStockMaterials = materials.filter((m) => m.stock < m.minStock);
-  const totalValue = materials.reduce((sum, m) => sum + (m.stock * (m.price || 0)), 0);
-  const categories = [...new Set(materials.map(m => m.category))].length;
+  // Calculs pour les statistiques (depuis le dashboard ou calculés localement)
+  const lowStockMaterials = materials.filter((m) => m.is_low_stock);
+  const totalValue = materials.reduce((sum, m) => sum + parseFloat(m.total_value || '0'), 0);
+  const categories = [...new Set(materials.map(m => m.category_name))].length;
+
+  // Loading state
+  if (loading && !materials.length) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <Package className="w-16 h-16 text-purple-600 mx-auto mb-4 animate-pulse" />
+          <p className="text-gray-600">Chargement des données...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <AlertTriangle className="w-16 h-16 text-red-600 mx-auto mb-4" />
+          <p className="text-gray-600">Erreur lors du chargement des données</p>
+          <button 
+            onClick={() => refresh()} 
+            className="mt-4 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+          >
+            Réessayer
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -157,7 +216,7 @@ export default function WarehousesPage() {
           <StatCard
             icon={<Boxes />}
             title="Total articles"
-            value={materials.length}
+            value={stats?.total_materials || materials.length}
             subtitle="Matières premières"
             bgColor="bg-blue-100"
             iconColor="text-blue-600"
@@ -166,7 +225,7 @@ export default function WarehousesPage() {
           <StatCard
             icon={<AlertTriangle />}
             title="Stock bas"
-            value={lowStockMaterials.length}
+            value={stats?.low_stock_count || lowStockMaterials.length}
             subtitle="Nécessite réapprovisionnement"
             bgColor="bg-red-100"
             iconColor="text-red-600"
@@ -175,7 +234,7 @@ export default function WarehousesPage() {
           <StatCard
             icon={<ShoppingBag />}
             title="Valeur totale"
-            value={`${totalValue.toFixed(2)}€`}
+            value={`${parseFloat(stats?.total_value || totalValue.toString()).toFixed(2)}€`}
             subtitle="Stock actuel"
             bgColor="bg-green-100"
             iconColor="text-green-600"
@@ -184,7 +243,7 @@ export default function WarehousesPage() {
           <StatCard
             icon={<Archive />}
             title="Catégories"
-            value={categories}
+            value={stats?.categories_count || categories}
             subtitle="Types de matières"
             bgColor="bg-purple-100"
             iconColor="text-purple-600"

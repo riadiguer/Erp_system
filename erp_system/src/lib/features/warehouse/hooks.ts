@@ -12,6 +12,9 @@ import {
   type PurchaseOrderDetail,
   type DashboardStats,
   type MaterialStatistics,
+  type StockMovementInput,
+  type MaterialInput,
+  type SupplierStatistics
 } from './api';
 
 // ==================== CATEGORIES ====================
@@ -262,6 +265,22 @@ export function useDashboard() {
     loading: !data && !error, 
     error, 
     refresh: mutate, 
+    isValidating 
+  };
+}
+
+// Add this to your hooks.ts file, in the SUPPLIERS section:
+
+export function useSupplierStatistics() {
+  const { data, error, mutate, isValidating } = useSWR<SupplierStatistics>(
+    '/warehouse/suppliers/statistics/',
+    WarehouseApi.suppliers.getStatistics
+  );
+  return { 
+    statistics: data, 
+    loading: !data && !error, 
+    error, 
+    refresh: mutate,
     isValidating 
   };
 }

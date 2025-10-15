@@ -1,24 +1,47 @@
 "use client";
 
-import { AlertTriangle, X, Trash2, Shield } from "lucide-react";
+import { AlertTriangle, X, Trash2, Shield, Loader2 } from "lucide-react";
+import { useState } from "react";
+import { WarehouseApi } from "@/lib/features/warehouse/api";
+import { Supplier } from "@/lib/features/warehouse/types";
+import { toast } from "sonner";
 
 interface SupplierDeleteModalProps {
   open: boolean;
   onClose: () => void;
-  supplier?: any;
-  onSuccess?: (deleted?: any) => void;
+  supplier?: Supplier | null;
+  onSuccess?: () => void;
 }
 
 export default function SupplierDeleteModal({
   open,
   onClose,
   supplier,
+  onSuccess,
 }: SupplierDeleteModalProps) {
+  const [loading, setLoading] = useState(false);
+
   if (!open) return null;
 
-  const handleDelete = () => {
-    console.log("Fournisseur supprimé :", supplier?.name);
-    onClose();
+  const handleDelete = async () => {
+    if (!supplier?.id) {
+      toast.error("Aucun fournisseur sélectionné");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      await WarehouseApi.suppliers.remove(supplier.id);
+      toast.success(`Fournisseur "${supplier.name}" supprimé avec succès`);
+      onSuccess?.();
+      onClose();
+    } catch (error: any) {
+      console.error("Erreur lors de la suppression:", error);
+      toast.error(error?.message || "Erreur lors de la suppression du fournisseur");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -50,7 +73,8 @@ export default function SupplierDeleteModal({
             {/* Bouton fermer */}
             <button
               onClick={onClose}
-              className="flex-shrink-0 p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all duration-200"
+              disabled={loading}
+              className="flex-shrink-0 p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all duration-200 disabled:opacity-50"
               title="Fermer"
             >
               <X className="w-5 h-5" />
@@ -68,6 +92,18 @@ export default function SupplierDeleteModal({
             <p className="text-lg font-bold text-red-600">
               {supplier?.name || "—"}
             </p>
+            {supplier?.contact_name && (
+              <p className="text-sm text-gray-600 mt-1">
+                Contact: {supplier.contact_name}
+              </p>
+            )}
+            {supplier?.materials_count !== undefined && supplier.materials_count > 0 && (
+              <div className="mt-3 pt-3 border-t border-red-200">
+                <p className="text-sm font-semibold text-red-700">
+                  ⚠️ Ce fournisseur est lié à {supplier.materials_count} matériau{supplier.materials_count > 1 ? 'x' : ''}
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Avertissement détaillé */}
@@ -76,20 +112,20 @@ export default function SupplierDeleteModal({
               <Shield className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
               <div className="text-sm text-gray-700 space-y-2">
                 <p className="font-semibold text-amber-900">
-                  Données qui seront supprimées :
+                  Données qui seront affectées :
                 </p>
                 <ul className="list-disc list-inside space-y-1 text-gray-600">
                   <li>Toutes les informations du fournisseur</li>
-                  <li>Historique des commandes</li>
-                  <li>Factures et paiements associés</li>
-                  <li>Documents joints</li>
+                  <li>Les matériaux liés devront être réassignés</li>
+                  <li>Historique des commandes (si applicable)</li>
+                  <li>Documents et notes associés</li>
                 </ul>
               </div>
             </div>
           </div>
 
           {/* Message final */}
-          <p className="text-sm text-gray-600 text-center">
+          <p className="text-sm text-gray-600 text-center font-medium">
             Cette opération ne peut pas être annulée.
           </p>
         </div>
@@ -98,16 +134,27 @@ export default function SupplierDeleteModal({
         <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 rounded-b-2xl flex items-center justify-end gap-3">
           <button
             onClick={onClose}
-            className="px-5 py-2.5 border border-gray-300 rounded-xl text-gray-700 font-medium hover:bg-gray-100 transition-all duration-200 hover:scale-105"
+            disabled={loading}
+            className="px-5 py-2.5 border border-gray-300 rounded-xl text-gray-700 font-medium hover:bg-gray-100 transition-all duration-200 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Annuler
           </button>
           <button
             onClick={handleDelete}
-            className="group px-5 py-2.5 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-xl font-semibold shadow-lg shadow-red-200 hover:shadow-xl hover:shadow-red-300 transition-all duration-200 hover:scale-105 flex items-center space-x-2"
+            disabled={loading}
+            className="group px-5 py-2.5 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-xl font-semibold shadow-lg shadow-red-200 hover:shadow-xl hover:shadow-red-300 transition-all duration-200 hover:scale-105 flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
           >
-            <Trash2 className="w-4 h-4 group-hover:rotate-12 transition-transform duration-200" />
-            <span>Supprimer définitivement</span>
+            {loading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Suppression...</span>
+              </>
+            ) : (
+              <>
+                <Trash2 className="w-4 h-4 group-hover:rotate-12 transition-transform duration-200" />
+                <span>Supprimer définitivement</span>
+              </>
+            )}
           </button>
         </div>
       </div>

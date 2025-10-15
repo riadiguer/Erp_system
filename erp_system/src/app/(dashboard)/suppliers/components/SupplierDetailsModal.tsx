@@ -1,16 +1,19 @@
 "use client";
 
 import { X, FileText, CreditCard, ClipboardList, Download, Share2 } from "lucide-react";
-import { useState } from "react";
+import { useState, useMemo } from "react";
+import { Supplier } from "@/lib/features/warehouse/types";
+import { usePurchaseOrders } from "@/lib/features/warehouse/hooks";
 import SupplierDetailsHeader from "./SupplierDetailsHeader";
 import SupplierDocuments from "./SupplierDocuments";
 import SupplierHistoryTable from "./SupplierHistoryTable";
 import SupplierInvoicesTable from "./SupplierInvoicesTable";
+import { toast } from "sonner";
 
 interface SupplierDetailsModalProps {
   open: boolean;
   onClose: () => void;
-  supplier?: any;
+  supplier?: Supplier | null;
 }
 
 export default function SupplierDetailsModal({
@@ -19,6 +22,21 @@ export default function SupplierDetailsModal({
   supplier,
 }: SupplierDetailsModalProps) {
   const [activeTab, setActiveTab] = useState<"history" | "invoices" | "documents">("history");
+  const { orders } = usePurchaseOrders();
+
+  // Calculate tab counts from real data
+  const tabCounts = useMemo(() => {
+    if (!supplier?.id) return { history: 0, invoices: 0, documents: 0 };
+
+    const supplierOrders = orders.filter(o => o.supplier === supplier.id);
+    const historyCount = supplierOrders.length;
+    const invoicesCount = supplierOrders.filter(o => o.status === 'received').length;
+    
+    // Documents count would come from a documents API when implemented
+    const documentsCount = 0;
+
+    return { history: historyCount, invoices: invoicesCount, documents: documentsCount };
+  }, [supplier?.id, orders]);
 
   if (!open || !supplier) return null;
 
@@ -57,6 +75,35 @@ export default function SupplierDetailsModal({
     </button>
   );
 
+  const handleExportPDF = () => {
+    // TODO: Implement PDF export functionality
+    toast.info("Export PDF en cours de développement");
+  };
+
+  const handleShare = () => {
+    // Copy supplier details to clipboard
+    const details = `
+Fournisseur: ${supplier.name}
+Contact: ${supplier.contact_name || 'N/A'}
+Téléphone: ${supplier.phone || 'N/A'}
+Email: ${supplier.email || 'N/A'}
+Adresse: ${supplier.address || 'N/A'}
+    `.trim();
+
+    navigator.clipboard.writeText(details).then(() => {
+      toast.success("Informations copiées dans le presse-papiers");
+    }).catch(() => {
+      toast.error("Erreur lors de la copie");
+    });
+  };
+
+  // Format last update date
+  const lastUpdateDate = new Date(supplier.updated_at).toLocaleDateString('fr-FR', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric'
+  });
+
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl h-[90vh] flex flex-col overflow-hidden transform animate-in zoom-in-95 duration-200">
@@ -80,6 +127,7 @@ export default function SupplierDetailsModal({
           <div className="flex items-center space-x-2">
             {/* Boutons d'action */}
             <button
+              onClick={handleShare}
               className="p-2.5 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 transition-all duration-200 hover:scale-105"
               title="Partager"
             >
@@ -87,6 +135,7 @@ export default function SupplierDetailsModal({
             </button>
             
             <button
+              onClick={handleExportPDF}
               className="flex items-center space-x-2 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105"
               title="Exporter en PDF"
             >
@@ -116,19 +165,19 @@ export default function SupplierDetailsModal({
               icon={ClipboardList}
               label="Historique des achats"
               tab="history"
-              count={12}
+              count={tabCounts.history}
             />
             <TabButton
               icon={FileText}
               label="Factures"
               tab="invoices"
-              count={8}
+              count={tabCounts.invoices}
             />
             <TabButton
               icon={CreditCard}
               label="Documents"
               tab="documents"
-              count={3}
+              count={tabCounts.documents}
             />
           </div>
         </div>
@@ -186,7 +235,7 @@ export default function SupplierDetailsModal({
         {/* Footer */}
         <div className="flex-shrink-0 px-6 py-4 bg-gradient-to-r from-gray-50 to-blue-50/30 border-t border-gray-200 flex items-center justify-between">
           <div className="text-sm text-gray-600">
-            Dernière modification : <span className="font-semibold text-gray-900">25 Sept 2025</span>
+            Dernière modification : <span className="font-semibold text-gray-900">{lastUpdateDate}</span>
           </div>
           <button
             onClick={onClose}

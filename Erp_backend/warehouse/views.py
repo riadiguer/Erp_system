@@ -2,7 +2,10 @@ from rest_framework import viewsets, status, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.db.models import Q, Sum, Count, F
+from django.db.models.functions import TruncMonth
 from django_filters.rest_framework import DjangoFilterBackend
+from datetime import datetime, timedelta
+from decimal import Decimal
 
 from .models import Category, Supplier, Material, StockMovement, PurchaseOrder
 from .permissions import (
@@ -54,6 +57,76 @@ class SupplierViewSet(viewsets.ModelViewSet):
         materials = supplier.materials.all()
         serializer = MaterialListSerializer(materials, many=True)
         return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def statistics(self, request):
+        """Statistiques sur les fournisseurs"""
+        # Statistiques de base
+        total_suppliers = Supplier.objects.count()
+        active_suppliers = Supplier.objects.filter(materials__isnull=False).distinct().count()
+        inactive_suppliers = total_suppliers - active_suppliers
+        
+        # Fournisseurs avec commandes en attente (approximation pour "avec dette")
+        suppliers_with_pending_orders = PurchaseOrder.objects.filter(
+            status__in=['sent', 'confirmed']
+        ).values('supplier').distinct().count()
+        
+        # Données mensuelles (9 derniers mois)
+        nine_months_ago = datetime.now() - timedelta(days=270)
+        
+        # Achats par mois (basé sur les purchase orders)
+        monthly_purchases = PurchaseOrder.objects.filter(
+            order_date__gte=nine_months_ago
+        ).annotate(
+            month=TruncMonth('order_date')
+        ).values('month').annotate(
+            total=Sum('total_amount')
+        ).order_by('month')
+        
+        # Formater les données mensuelles
+        monthly_data = []
+        months_fr = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sept', 'Oct', 'Nov', 'Déc']
+        
+        # Créer un dictionnaire des données existantes
+        purchases_dict = {}
+        for item in monthly_purchases:
+            month_key = item['month'].strftime('%Y-%m')
+            purchases_dict[month_key] = float(item['total'] or 0)
+        
+        # Générer les 9 derniers mois avec données ou 0
+        current_date = datetime.now()
+        for i in range(8, -1, -1):
+            target_date = current_date - timedelta(days=30 * i)
+            month_key = target_date.strftime('%Y-%m')
+            month_num = target_date.month - 1
+            
+            achats = purchases_dict.get(month_key, 0)
+            # Approximation: 90% des achats sont payés
+            paiements = achats * 0.9
+            
+            monthly_data.append({
+                'month': months_fr[month_num],
+                'achats': achats,
+                'paiements': paiements,
+            })
+        
+        # Totaux
+        total_achats = sum(item['achats'] for item in monthly_data)
+        total_paiements = sum(item['paiements'] for item in monthly_data)
+        solde = total_achats - total_paiements
+        
+        stats = {
+            'total_suppliers': total_suppliers,
+            'active_suppliers': active_suppliers,
+            'inactive_suppliers': inactive_suppliers,
+            'suppliers_with_debt': suppliers_with_pending_orders,
+            'monthly_data': monthly_data,
+            'total_achats': total_achats,
+            'total_paiements': total_paiements,
+            'solde': solde,
+        }
+        
+        return Response(stats)
 
 
 class MaterialViewSet(viewsets.ModelViewSet):
@@ -218,6 +291,103 @@ class PurchaseOrderViewSet(viewsets.ModelViewSet):
         purchase_order.actual_delivery_date = request.data.get('delivery_date')
         purchase_order.save()
 
+        serializer = PurchaseOrderDetailSerializer(purchase_order)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'])
+    def cancel(self, request, pk=None):
+        """Annuler une commande"""
+        purchase_order = self.get_object()
+        
+        if purchase_order.status == 'received':
+            return Response(
+                {'error': 'Impossible d\'annuler une commande déjà reçue'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if purchase_order.status == 'cancelled':
+            return Response(
+                {'error': 'Cette commande est déjà annulée'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        purchase_order.status = 'cancelled'
+        purchase_order.save()
+        
+        serializer = PurchaseOrderDetailSerializer(purchase_order)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'])
+    def receive_partial(self, request, pk=None):
+        """Réception partielle d'une commande"""
+        purchase_order = self.get_object()
+        
+        if purchase_order.status == 'received':
+            return Response(
+                {'error': 'Cette commande a déjà été entièrement reçue'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if purchase_order.status == 'cancelled':
+            return Response(
+                {'error': 'Impossible de recevoir une commande annulée'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        received_items = request.data.get('items', [])
+        
+        if not received_items:
+            return Response(
+                {'error': 'Aucun article à recevoir'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        for item_data in received_items:
+            try:
+                item = purchase_order.items.get(id=item_data.get('id'))
+                quantity = Decimal(str(item_data.get('quantity', 0)))
+                
+                if quantity <= 0:
+                    continue
+                
+                # Vérifier qu'on ne reçoit pas plus que commandé
+                remaining = item.quantity - item.received_quantity
+                if quantity > remaining:
+                    quantity = remaining
+                
+                # Créer un mouvement de stock
+                StockMovement.objects.create(
+                    material=item.material,
+                    movement_type='in',
+                    quantity=quantity,
+                    previous_stock=item.material.stock,
+                    new_stock=item.material.stock + quantity,
+                    notes=f"Réception partielle commande {purchase_order.order_number}",
+                    created_by=request.data.get('created_by', 'System')
+                )
+                
+                # Mettre à jour le stock
+                item.material.stock += quantity
+                item.material.save()
+                
+                # Mettre à jour la quantité reçue
+                item.received_quantity += quantity
+                item.save()
+                
+            except Exception as e:
+                return Response(
+                    {'error': f'Erreur lors de la réception de l\'article: {str(e)}'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        
+        # Vérifier si tout est reçu
+        all_received = all(item.is_fully_received for item in purchase_order.items.all())
+        if all_received:
+            purchase_order.status = 'received'
+            if not purchase_order.actual_delivery_date:
+                purchase_order.actual_delivery_date = request.data.get('delivery_date')
+            purchase_order.save()
+        
         serializer = PurchaseOrderDetailSerializer(purchase_order)
         return Response(serializer.data)
 

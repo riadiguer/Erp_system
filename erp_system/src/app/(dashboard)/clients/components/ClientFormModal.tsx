@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { X, Save, User, Mail, Phone, Building2, DollarSign, Calendar, CheckCircle, AlertCircle } from "lucide-react";
 
 type Client = {
@@ -31,36 +31,47 @@ function generateId() {
   return `id_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
 }
 
-export default function ClientFormModal({ open, initialData = null, onClose, onSave }: Props) {
-  const empty: Client = {
-    id: generateId(),
-    firstName: "",
-    lastName: "",
-    email: "",
-    phone: "",
-    type: "Particulier",
-    balance: 0,
-    lastOrder: undefined,
-    createdAt: new Date().toISOString().slice(0, 10),
-    status: "Actif",
-  };
+const getEmptyClient = (): Client => ({
+  id: generateId(),
+  firstName: "",
+  lastName: "",
+  email: "",
+  phone: "",
+  type: "Particulier",
+  balance: 0,
+  lastOrder: undefined,
+  createdAt: new Date().toISOString().slice(0, 10),
+  status: "Actif",
+});
 
-  const [form, setForm] = useState<Client>(empty);
+export default function ClientFormModal({ open, initialData = null, onClose, onSave }: Props) {
+  const [form, setForm] = useState<Client>(getEmptyClient());
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
 
+  // Réinitialiser le formulaire quand open ou initialData change
   useEffect(() => {
-    if (!open) return;
-    if (initialData) {
-      setForm({ ...initialData });
-    } else {
-      setForm({ ...empty, id: generateId(), createdAt: new Date().toISOString().slice(0, 10) });
+    if (open) {
+      if (initialData) {
+        setForm({ ...initialData });
+      } else {
+        setForm(getEmptyClient());
+      }
+      setErrors({});
+      setTouched({});
     }
-    setErrors({});
-    setTouched({});
   }, [open, initialData]);
 
+  // Affiche le modal UNIQUEMENT si open === true
   if (!open) return null;
+
+  // Reset manuel de l'état du formulaire à la fermeture du modal
+  const handleClose = () => {
+    setForm(getEmptyClient());
+    setErrors({});
+    setTouched({});
+    onClose();
+  };
 
   const handleBlur = (field: string) => {
     setTouched((prev) => ({ ...prev, [field]: true }));
@@ -69,7 +80,7 @@ export default function ClientFormModal({ open, initialData = null, onClose, onS
 
   const validateField = (field: string): boolean => {
     const e: Record<string, string> = { ...errors };
-    
+
     switch (field) {
       case "firstName":
         if (!form.firstName || form.firstName.trim().length < 2) {
@@ -100,7 +111,7 @@ export default function ClientFormModal({ open, initialData = null, onClose, onS
         }
         break;
     }
-    
+
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -109,14 +120,14 @@ export default function ClientFormModal({ open, initialData = null, onClose, onS
     const fields = ["firstName", "lastName", "email", "phone"];
     let isValid = true;
     const allTouched: Record<string, boolean> = {};
-    
+
     fields.forEach((field) => {
       allTouched[field] = true;
       if (!validateField(field)) {
         isValid = false;
       }
     });
-    
+
     setTouched(allTouched);
     return isValid;
   };
@@ -131,82 +142,32 @@ export default function ClientFormModal({ open, initialData = null, onClose, onS
       balance: Number(form.balance ?? 0),
     };
     onSave(payload);
+    // Reset du form après enregistrement
+    setForm(getEmptyClient());
+    setErrors({});
+    setTouched({});
   };
 
-  const InputField = ({ 
-    label, 
-    name, 
-    type = "text", 
-    icon: Icon, 
-    required = false,
-    placeholder = ""
-  }) => {
-    const hasError = touched[name] && errors[name];
-    const isValid = touched[name] && !errors[name] && form[name];
-
-    return (
-      <div>
-        <label className="block text-sm font-semibold text-gray-700 mb-2">
-          {label}
-          {required && <span className="text-red-500 ml-1">*</span>}
-        </label>
-        <div className="relative">
-          {Icon && (
-            <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
-              <Icon className="w-5 h-5" />
-            </div>
-          )}
-          <input
-            type={type}
-            name={name}
-            value={form[name] || ""}
-            onChange={(e) => setForm((s) => ({ ...s, [name]: e.target.value }))}
-            onBlur={() => handleBlur(name)}
-            placeholder={placeholder}
-            className={`w-full ${Icon ? "pl-10" : "pl-4"} pr-10 py-3 border rounded-lg focus:ring-2 focus:outline-none transition-all ${
-              hasError
-                ? "border-red-300 focus:border-red-500 focus:ring-red-200 bg-red-50"
-                : isValid
-                ? "border-green-300 focus:border-green-500 focus:ring-green-200 bg-green-50"
-                : "border-gray-300 focus:border-blue-500 focus:ring-blue-200"
-            }`}
-          />
-          {hasError && (
-            <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-red-500">
-              <AlertCircle className="w-5 h-5" />
-            </div>
-          )}
-          {isValid && (
-            <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-green-500">
-              <CheckCircle className="w-5 h-5" />
-            </div>
-          )}
-        </div>
-        {hasError && (
-          <p className="mt-1 text-sm text-red-600 flex items-center">
-            <AlertCircle className="w-4 h-4 mr-1" />
-            {errors[name]}
-          </p>
-        )}
-      </div>
-    );
+  // Fonction de mise à jour stable qui ne change pas à chaque render
+  const updateField = (field: keyof Client, value: any) => {
+    setForm((prevForm) => ({
+      ...prevForm,
+      [field]: value,
+    }));
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <form
-        onSubmit={handleSubmit}
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col"
-      >
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-6 text-white relative overflow-hidden">
           <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-32 -mt-32" />
           <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/10 rounded-full -ml-24 -mb-24" />
-          
+
           <div className="relative z-10">
             <button
               type="button"
-              onClick={onClose}
+              onClick={handleClose}
               className="absolute right-0 top-0 text-white/80 hover:text-white transition-colors"
               aria-label="Fermer"
             >
@@ -237,20 +198,91 @@ export default function ClientFormModal({ open, initialData = null, onClose, onS
                 Informations personnelles
               </h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <InputField
-                  label="Prénom"
-                  name="firstName"
-                  icon={User}
-                  required
-                  placeholder="Ex: Ahmed"
-                />
-                <InputField
-                  label="Nom"
-                  name="lastName"
-                  icon={User}
-                  required
-                  placeholder="Ex: Benali"
-                />
+                {/* Prénom */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Prénom
+                    <span className="text-red-500 ml-1">*</span>
+                  </label>
+                  <div className="relative">
+                    <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
+                      <User className="w-5 h-5" />
+                    </div>
+                    <input
+                      type="text"
+                      value={form.firstName}
+                      onChange={(e) => updateField("firstName", e.target.value)}
+                      onBlur={() => handleBlur("firstName")}
+                      placeholder="Ex: Ahmed"
+                      className={`w-full pl-10 pr-10 py-3 border rounded-lg focus:ring-2 focus:outline-none transition-all ${
+                        touched.firstName && errors.firstName
+                          ? "border-red-300 focus:border-red-500 focus:ring-red-200 bg-red-50"
+                          : touched.firstName && form.firstName
+                          ? "border-green-300 focus:border-green-500 focus:ring-green-200 bg-green-50"
+                          : "border-gray-300 focus:border-blue-500 focus:ring-blue-200"
+                      }`}
+                    />
+                    {touched.firstName && errors.firstName && (
+                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-red-500">
+                        <AlertCircle className="w-5 h-5" />
+                      </div>
+                    )}
+                    {touched.firstName && !errors.firstName && form.firstName && (
+                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-green-500">
+                        <CheckCircle className="w-5 h-5" />
+                      </div>
+                    )}
+                  </div>
+                  {touched.firstName && errors.firstName && (
+                    <p className="mt-1 text-sm text-red-600 flex items-center">
+                      <AlertCircle className="w-4 h-4 mr-1" />
+                      {errors.firstName}
+                    </p>
+                  )}
+                </div>
+
+                {/* Nom */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Nom
+                    <span className="text-red-500 ml-1">*</span>
+                  </label>
+                  <div className="relative">
+                    <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
+                      <User className="w-5 h-5" />
+                    </div>
+                    <input
+                      type="text"
+                      value={form.lastName}
+                      onChange={(e) => updateField("lastName", e.target.value)}
+                      onBlur={() => handleBlur("lastName")}
+                      placeholder="Ex: Benali"
+                      className={`w-full pl-10 pr-10 py-3 border rounded-lg focus:ring-2 focus:outline-none transition-all ${
+                        touched.lastName && errors.lastName
+                          ? "border-red-300 focus:border-red-500 focus:ring-red-200 bg-red-50"
+                          : touched.lastName && form.lastName
+                          ? "border-green-300 focus:border-green-500 focus:ring-green-200 bg-green-50"
+                          : "border-gray-300 focus:border-blue-500 focus:ring-blue-200"
+                      }`}
+                    />
+                    {touched.lastName && errors.lastName && (
+                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-red-500">
+                        <AlertCircle className="w-5 h-5" />
+                      </div>
+                    )}
+                    {touched.lastName && !errors.lastName && form.lastName && (
+                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-green-500">
+                        <CheckCircle className="w-5 h-5" />
+                      </div>
+                    )}
+                  </div>
+                  {touched.lastName && errors.lastName && (
+                    <p className="mt-1 text-sm text-red-600 flex items-center">
+                      <AlertCircle className="w-4 h-4 mr-1" />
+                      {errors.lastName}
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -261,19 +293,89 @@ export default function ClientFormModal({ open, initialData = null, onClose, onS
                 Coordonnées
               </h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <InputField
-                  label="Email"
-                  name="email"
-                  type="email"
-                  icon={Mail}
-                  placeholder="client@example.com"
-                />
-                <InputField
-                  label="Téléphone"
-                  name="phone"
-                  icon={Phone}
-                  placeholder="+213 6X XX XX XX"
-                />
+                {/* Email */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Email
+                  </label>
+                  <div className="relative">
+                    <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
+                      <Mail className="w-5 h-5" />
+                    </div>
+                    <input
+                      type="email"
+                      value={form.email ?? ""}
+                      onChange={(e) => updateField("email", e.target.value)}
+                      onBlur={() => handleBlur("email")}
+                      placeholder="client@example.com"
+                      className={`w-full pl-10 pr-10 py-3 border rounded-lg focus:ring-2 focus:outline-none transition-all ${
+                        touched.email && errors.email
+                          ? "border-red-300 focus:border-red-500 focus:ring-red-200 bg-red-50"
+                          : touched.email && form.email
+                          ? "border-green-300 focus:border-green-500 focus:ring-green-200 bg-green-50"
+                          : "border-gray-300 focus:border-blue-500 focus:ring-blue-200"
+                      }`}
+                    />
+                    {touched.email && errors.email && (
+                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-red-500">
+                        <AlertCircle className="w-5 h-5" />
+                      </div>
+                    )}
+                    {touched.email && !errors.email && form.email && (
+                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-green-500">
+                        <CheckCircle className="w-5 h-5" />
+                      </div>
+                    )}
+                  </div>
+                  {touched.email && errors.email && (
+                    <p className="mt-1 text-sm text-red-600 flex items-center">
+                      <AlertCircle className="w-4 h-4 mr-1" />
+                      {errors.email}
+                    </p>
+                  )}
+                </div>
+
+                {/* Téléphone */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Téléphone
+                  </label>
+                  <div className="relative">
+                    <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
+                      <Phone className="w-5 h-5" />
+                    </div>
+                    <input
+                      type="text"
+                      value={form.phone ?? ""}
+                      onChange={(e) => updateField("phone", e.target.value)}
+                      onBlur={() => handleBlur("phone")}
+                      placeholder="+213 6X XX XX XX"
+                      className={`w-full pl-10 pr-10 py-3 border rounded-lg focus:ring-2 focus:outline-none transition-all ${
+                        touched.phone && errors.phone
+                          ? "border-red-300 focus:border-red-500 focus:ring-red-200 bg-red-50"
+                          : touched.phone && form.phone
+                          ? "border-green-300 focus:border-green-500 focus:ring-green-200 bg-green-50"
+                          : "border-gray-300 focus:border-blue-500 focus:ring-blue-200"
+                      }`}
+                    />
+                    {touched.phone && errors.phone && (
+                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-red-500">
+                        <AlertCircle className="w-5 h-5" />
+                      </div>
+                    )}
+                    {touched.phone && !errors.phone && form.phone && (
+                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-green-500">
+                        <CheckCircle className="w-5 h-5" />
+                      </div>
+                    )}
+                  </div>
+                  {touched.phone && errors.phone && (
+                    <p className="mt-1 text-sm text-red-600 flex items-center">
+                      <AlertCircle className="w-4 h-4 mr-1" />
+                      {errors.phone}
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -288,7 +390,7 @@ export default function ClientFormModal({ open, initialData = null, onClose, onS
                   <label className="block text-sm font-semibold text-gray-700 mb-2">Type de client</label>
                   <select
                     value={form.type}
-                    onChange={(e) => setForm((s) => ({ ...s, type: e.target.value as Client["type"] }))}
+                    onChange={(e) => updateField("type", e.target.value as Client["type"])}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-500"
                   >
                     <option value="Particulier">Particulier</option>
@@ -300,7 +402,7 @@ export default function ClientFormModal({ open, initialData = null, onClose, onS
                   <label className="block text-sm font-semibold text-gray-700 mb-2">Statut</label>
                   <select
                     value={form.status}
-                    onChange={(e) => setForm((s) => ({ ...s, status: e.target.value as Client["status"] }))}
+                    onChange={(e) => updateField("status", e.target.value as Client["status"])}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-500"
                   >
                     <option value="Actif">Actif</option>
@@ -326,8 +428,9 @@ export default function ClientFormModal({ open, initialData = null, onClose, onS
                       onChange={(e) => {
                         const v = e.target.value;
                         const num = v === "" ? 0 : Number(v);
-                        if (isNaN(num)) return;
-                        setForm((s) => ({ ...s, balance: num }));
+                        if (!isNaN(num)) {
+                          updateField("balance", num);
+                        }
                       }}
                       type="number"
                       step="0.01"
@@ -343,7 +446,7 @@ export default function ClientFormModal({ open, initialData = null, onClose, onS
                     <Calendar className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
                     <input
                       value={form.createdAt ?? ""}
-                      onChange={(e) => setForm((s) => ({ ...s, createdAt: e.target.value }))}
+                      onChange={(e) => updateField("createdAt", e.target.value)}
                       type="date"
                       className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-500"
                     />
@@ -357,7 +460,7 @@ export default function ClientFormModal({ open, initialData = null, onClose, onS
               <label className="block text-sm font-semibold text-gray-700 mb-2">Dernière commande (ID / date)</label>
               <input
                 value={form.lastOrder ?? ""}
-                onChange={(e) => setForm((s) => ({ ...s, lastOrder: e.target.value }))}
+                onChange={(e) => updateField("lastOrder", e.target.value)}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-500"
                 placeholder="ex: #1234 - 2025-09-01"
               />
@@ -369,21 +472,22 @@ export default function ClientFormModal({ open, initialData = null, onClose, onS
         <div className="p-6 border-t border-gray-200 bg-gray-50 flex items-center justify-end gap-3">
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleClose}
             className="px-6 py-3 rounded-lg border border-gray-300 hover:bg-gray-100 transition-colors font-medium"
           >
             Annuler
           </button>
 
           <button
-            type="submit"
+            type="button"
+            onClick={handleSubmit}
             className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg hover:shadow-xl font-medium"
           >
             <Save className="w-5 h-5 mr-2" />
             {initialData ? "Enregistrer les modifications" : "Créer le client"}
           </button>
         </div>
-      </form>
+      </div>
     </div>
   );
 }

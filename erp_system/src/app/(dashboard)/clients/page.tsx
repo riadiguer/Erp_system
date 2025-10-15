@@ -22,6 +22,7 @@ import ClientSalesEvolution from "./components/Charts/ClientSalesEvolution";
 import ClientsPieChart from "./components/Charts/ClientsPieChart";
 import TopClientsBarChart from "./components/Charts/TopClientsBarChart";
 import ClientDetailsModal from "./components/ClientDetailsModal";
+import { useCallback } from "react";
 
 export type Client = {
   id: string;
@@ -144,31 +145,33 @@ export default function ClientsPage() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
 
-  const openNewClient = () => {
+  const openNewClient = useCallback(() => {
     setEditingClient(null);
     setIsFormOpen(true);
-  };
+  }, []);
 
-  const openEditClient = (c: Client) => {
+  const openEditClient = useCallback((c: Client) => {
     setEditingClient(c);
     setIsFormOpen(true);
-  };
+  }, []);
 
-  const saveClient = (payload: Client) => {
-    // Ensure 'type' is always defined
+  const closeForm = useCallback(() => {
+    setIsFormOpen(false);
+  }, []);
+
+  const saveClient = useCallback((payload: Client) => {
     const client: Client = {
       ...payload,
       type: payload.type ?? "Particulier",
     };
     setClients((prev) => {
       const exists = prev.find((p) => p.id === client.id);
-      if (exists) {
-        return prev.map((p) => (p.id === client.id ? client : p));
-      }
+      if (exists) return prev.map((p) => (p.id === client.id ? client : p));
       return [client, ...prev];
     });
     setIsFormOpen(false);
-  };
+  }, []);
+
 
   const deleteClient = (id: string) => {
     setClients((prev) => prev.filter((p) => p.id !== id));
@@ -372,9 +375,10 @@ export default function ClientsPage() {
       <ClientFormModal 
         open={isFormOpen} 
         initialData={editingClient} 
-        onClose={() => setIsFormOpen(false)} 
+        onClose={closeForm} 
         onSave={saveClient} 
       />
+
 
       <ClientDetailsModal
         open={!!selectedClient}

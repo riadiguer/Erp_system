@@ -1,6 +1,6 @@
 import { apiFetch } from '@/lib/api/client';
 
-// ——— Types (sync with your serializers) ———
+// —— Types (sync with your serializers) ——
 export type UUID = string;
 
 export type Category = {
@@ -30,6 +30,22 @@ export type Supplier = {
   updated_at: string;
 };
 
+// ✅ NEW: Supplier Statistics Type
+export type SupplierStatistics = {
+  total_suppliers: number;
+  active_suppliers: number;
+  inactive_suppliers: number;
+  suppliers_with_debt: number;
+  monthly_data: Array<{
+    month: string;
+    achats: number;
+    paiements: number;
+  }>;
+  total_achats: number;
+  total_paiements: number;
+  solde: number;
+};
+
 export type UnitType = 'mètre' | 'rouleau' | 'litre' | 'kg' | 'pièce' | 'boîte';
 
 export type Material = {
@@ -40,10 +56,10 @@ export type Material = {
   category_name?: string;
   supplier: number;
   supplier_name?: string;
-  stock: string; // Decimal as string
-  min_stock: string; // Decimal as string
+  stock: string;
+  min_stock: string;
   unit: UnitType;
-  price: string; // Decimal as string
+  price: string;
   description?: string;
   is_low_stock: boolean;
   stock_percentage: string;
@@ -165,7 +181,7 @@ export type PurchaseOrderInput = {
   items?: PurchaseOrderItem[];
 };
 
-// ——— HTTP helpers ———
+// —— HTTP helpers ——
 const get = <T>(p: string) => apiFetch<T>(p);
 const post = <T>(p: string, body?: any) => 
   apiFetch<T>(p, { method: 'POST', body: body ? JSON.stringify(body) : undefined });
@@ -174,9 +190,9 @@ const put = <T>(p: string, body: any) =>
 const patch = <T>(p: string, body: any) => 
   apiFetch<T>(p, { method: 'PATCH', body: JSON.stringify(body) });
 const del = <T>(p: string) => 
-  apiFetch<T>(p, { method: 'DELETE' });
+  apiFetch<T>(p, { method: 'DELETE', body: undefined });
 
-// ——— Endpoints ———
+// —— Endpoints ——
 export const WarehouseApi = {
   // Categories
   categories: {
@@ -192,6 +208,7 @@ export const WarehouseApi = {
     list: () => get<Supplier[]>('/warehouse/suppliers/'),
     get: (id: number) => get<Supplier>(`/warehouse/suppliers/${id}/`),
     getMaterials: (id: number) => get<Material[]>(`/warehouse/suppliers/${id}/materials/`),
+    getStatistics: () => get<SupplierStatistics>('/warehouse/suppliers/statistics/'), // ✅ NEW
     create: (payload: Partial<Supplier>) => post<Supplier>('/warehouse/suppliers/', payload),
     update: (id: number, payload: Partial<Supplier>) => patch<Supplier>(`/warehouse/suppliers/${id}/`, payload),
     remove: (id: number) => del<{}>(`/warehouse/suppliers/${id}/`),

@@ -1,82 +1,119 @@
 "use client";
 
-import { FileText, Eye, Download, Calendar, MapPin, DollarSign, CheckCircle, Clock, AlertCircle } from "lucide-react";
+import { FileText, Eye, Download, Calendar, MapPin, DollarSign, CheckCircle, Clock, AlertCircle, XCircle, Loader2 } from "lucide-react";
+import { Supplier, PurchaseOrder } from "@/lib/features/warehouse/types";
+import { usePurchaseOrders } from "@/lib/features/warehouse/hooks";
+import { useMemo } from "react";
 
 interface SupplierHistoryTableProps {
-  supplier?: any;
+  supplier?: Supplier | null;
 }
 
 export default function SupplierHistoryTable({ supplier }: SupplierHistoryTableProps) {
-  const history = supplier?.history || [
-    {
-      id: 101,
-      orderNumber: "BC-2025-0045",
-      date: "2025-09-25",
-      site: "Showroom Alger",
-      total: 450000,
-      status: "Livré",
-    },
-    {
-      id: 102,
-      orderNumber: "BC-2025-0041",
-      date: "2025-09-12",
-      site: "Usine Tipaza",
-      total: 780000,
-      status: "En attente de paiement",
-    },
-    {
-      id: 103,
-      orderNumber: "BC-2025-0039",
-      date: "2025-08-28",
-      site: "Dépôt Blida",
-      total: 320000,
-      status: "Reçu",
-    },
-    {
-      id: 104,
-      orderNumber: "BC-2025-0035",
-      date: "2025-08-15",
-      site: "Showroom Alger",
-      total: 580000,
-      status: "Livré",
-    },
-  ];
+  const { orders, loading } = usePurchaseOrders();
+
+  // Filter orders for this supplier
+  const supplierOrders = useMemo(() => {
+    if (!supplier?.id) return [];
+    return orders.filter(order => order.supplier === supplier.id);
+  }, [orders, supplier?.id]);
 
   const StatusBadge = ({ status }: { status: string }) => {
-    const statusConfig: any = {
-      "Livré": {
+    const statusConfig: Record<string, {
+      icon: any;
+      color: string;
+      dotColor: string;
+      label: string;
+    }> = {
+      "draft": {
+        icon: AlertCircle,
+        color: "bg-gray-100 text-gray-700 border-gray-200",
+        dotColor: "bg-gray-500",
+        label: "Brouillon"
+      },
+      "sent": {
+        icon: Clock,
+        color: "bg-blue-100 text-blue-700 border-blue-200",
+        dotColor: "bg-blue-500",
+        label: "Envoyé"
+      },
+      "confirmed": {
+        icon: CheckCircle,
+        color: "bg-purple-100 text-purple-700 border-purple-200",
+        dotColor: "bg-purple-500",
+        label: "Confirmé"
+      },
+      "received": {
         icon: CheckCircle,
         color: "bg-green-100 text-green-700 border-green-200",
-        dotColor: "bg-green-500"
+        dotColor: "bg-green-500",
+        label: "Reçu"
       },
-      "En attente de paiement": {
-        icon: Clock,
-        color: "bg-amber-100 text-amber-700 border-amber-200",
-        dotColor: "bg-amber-500"
-      },
-      "Reçu": {
-        icon: CheckCircle,
-        color: "bg-blue-100 text-blue-700 border-blue-200",
-        dotColor: "bg-blue-500"
-      },
-      "En cours": {
-        icon: AlertCircle,
-        color: "bg-purple-100 text-purple-700 border-purple-200",
-        dotColor: "bg-purple-500"
+      "cancelled": {
+        icon: XCircle,
+        color: "bg-red-100 text-red-700 border-red-200",
+        dotColor: "bg-red-500",
+        label: "Annulé"
       }
     };
 
-    const config = statusConfig[status] || statusConfig["En cours"];
+    const config = statusConfig[status] || statusConfig["draft"];
     const Icon = config.icon;
 
     return (
       <div className={`inline-flex items-center space-x-2 px-3 py-1.5 rounded-lg border font-semibold text-xs ${config.color}`}>
-        <div className={`w-2 h-2 rounded-full ${config.dotColor} animate-pulse`}></div>
+        <div className={`w-2 h-2 rounded-full ${config.dotColor} ${status !== 'cancelled' ? 'animate-pulse' : ''}`}></div>
         <Icon className="w-3.5 h-3.5" />
-        <span>{status}</span>
+        <span>{config.label}</span>
       </div>
     );
   };
+
+  // Calculate totals
+  const stats = useMemo(() => {
+    const total = supplierOrders.reduce((sum, order) => sum + parseFloat(order.total_amount || '0'), 0);
+    const received = supplierOrders.filter(o => o.status === 'received').length;
+    const pending = supplierOrders.filter(o => ['sent', 'confirmed'].includes(o.status)).length;
+    
+    return { total, received, pending };
+  }, [supplierOrders]);
+
+  if (loading) {
+    return (
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <Loader2 className="w-8 h-8 text-blue-600 animate-spin mx-auto mb-2" />
+            <p className="text-sm text-gray-600">Chargement de l'historique...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!supplier) {
+    return (
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+        <div className="flex items-center justify-center h-64">
+          <p className="text-gray-500">Aucun fournisseur sélectionné</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (supplierOrders.length === 0) {
+    return (
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <FileText className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+            <p className="text-gray-500 font-medium">Aucun bon de commande</p>
+            <p className="text-sm text-gray-400 mt-1">Ce fournisseur n'a pas encore de commandes</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
@@ -92,10 +129,10 @@ export default function SupplierHistoryTable({ supplier }: SupplierHistoryTableP
                 Bon de commande
               </th>
               <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                Date
+                Date de commande
               </th>
               <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                Site
+                Livraison prévue
               </th>
               <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
                 Montant total
@@ -110,9 +147,9 @@ export default function SupplierHistoryTable({ supplier }: SupplierHistoryTableP
           </thead>
 
           <tbody className="bg-white divide-y divide-gray-100">
-            {history.map((h, index) => (
+            {supplierOrders.map((order, index) => (
               <tr 
-                key={h.id} 
+                key={order.id} 
                 className="hover:bg-blue-50/50 transition-colors duration-200 group"
               >
                 <td className="px-6 py-4 whitespace-nowrap">
@@ -129,8 +166,10 @@ export default function SupplierHistoryTable({ supplier }: SupplierHistoryTableP
                       <FileText className="w-4 h-4 text-blue-600" />
                     </div>
                     <div>
-                      <p className="text-sm font-bold text-gray-900">{h.orderNumber}</p>
-                      <p className="text-xs text-gray-500">Commande #{h.id}</p>
+                      <p className="text-sm font-bold text-gray-900">{order.order_number}</p>
+                      <p className="text-xs text-gray-500">
+                        {order.items_count || 0} article{(order.items_count || 0) > 1 ? 's' : ''}
+                      </p>
                     </div>
                   </div>
                 </td>
@@ -138,14 +177,24 @@ export default function SupplierHistoryTable({ supplier }: SupplierHistoryTableP
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="flex items-center space-x-2 text-sm text-gray-700">
                     <Calendar className="w-4 h-4 text-gray-400" />
-                    <span className="font-medium">{h.date}</span>
+                    <span className="font-medium">
+                      {new Date(order.order_date).toLocaleDateString('fr-FR')}
+                    </span>
                   </div>
                 </td>
 
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="flex items-center space-x-2">
-                    <MapPin className="w-4 h-4 text-purple-500" />
-                    <span className="text-sm font-medium text-gray-700">{h.site}</span>
+                    {order.expected_delivery_date ? (
+                      <>
+                        <MapPin className="w-4 h-4 text-purple-500" />
+                        <span className="text-sm font-medium text-gray-700">
+                          {new Date(order.expected_delivery_date).toLocaleDateString('fr-FR')}
+                        </span>
+                      </>
+                    ) : (
+                      <span className="text-sm text-gray-400 italic">Non définie</span>
+                    )}
                   </div>
                 </td>
 
@@ -153,13 +202,16 @@ export default function SupplierHistoryTable({ supplier }: SupplierHistoryTableP
                   <div className="flex items-center space-x-2">
                     <DollarSign className="w-4 h-4 text-green-600" />
                     <span className="text-sm font-bold text-gray-900">
-                      {h.total.toLocaleString()} DA
+                      {parseFloat(order.total_amount || '0').toLocaleString('fr-FR', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2
+                      })} DA
                     </span>
                   </div>
                 </td>
 
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <StatusBadge status={h.status} />
+                  <StatusBadge status={order.status} />
                 </td>
 
                 <td className="px-6 py-4 whitespace-nowrap">
@@ -167,12 +219,20 @@ export default function SupplierHistoryTable({ supplier }: SupplierHistoryTableP
                     <button
                       className="p-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-all duration-200 hover:scale-110"
                       title="Voir détails"
+                      onClick={() => {
+                        // TODO: Open order details modal
+                        console.log('View order:', order.id);
+                      }}
                     >
                       <Eye className="w-4 h-4" />
                     </button>
                     <button
                       className="p-2 rounded-lg bg-green-50 text-green-600 hover:bg-green-100 transition-all duration-200 hover:scale-110"
                       title="Télécharger PDF"
+                      onClick={() => {
+                        // TODO: Generate and download PDF
+                        console.log('Download order:', order.id);
+                      }}
                     >
                       <Download className="w-4 h-4" />
                     </button>
@@ -191,26 +251,29 @@ export default function SupplierHistoryTable({ supplier }: SupplierHistoryTableP
             <div className="flex items-center space-x-2">
               <div className="w-2 h-2 bg-green-500 rounded-full"></div>
               <span className="text-sm font-semibold text-gray-700">
-                {history.filter(h => h.status === "Livré").length} Livrées
+                {stats.received} Reçue{stats.received > 1 ? 's' : ''}
               </span>
             </div>
             <div className="flex items-center space-x-2">
               <div className="w-2 h-2 bg-amber-500 rounded-full"></div>
               <span className="text-sm font-semibold text-gray-700">
-                {history.filter(h => h.status === "En attente de paiement").length} En attente
+                {stats.pending} En attente
               </span>
             </div>
             <div className="flex items-center space-x-2">
               <DollarSign className="w-4 h-4 text-gray-600" />
               <span className="text-sm font-bold text-gray-900">
-                Total: {history.reduce((sum, h) => sum + h.total, 0).toLocaleString()} DA
+                Total: {stats.total.toLocaleString('fr-FR', {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2
+                })} DA
               </span>
             </div>
           </div>
 
-          <button className="px-5 py-2.5 bg-white border border-gray-300 rounded-xl text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-all duration-200 hover:scale-105 shadow-sm">
-            Voir tout l'historique
-          </button>
+          <div className="text-sm text-gray-600">
+            <span className="font-semibold">{supplierOrders.length}</span> commande{supplierOrders.length > 1 ? 's' : ''} au total
+          </div>
         </div>
       </div>
     </div>

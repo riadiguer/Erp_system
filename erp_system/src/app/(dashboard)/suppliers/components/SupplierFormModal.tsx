@@ -1,17 +1,18 @@
 "use client";
 
-import { X, Save, Edit, Building2, User, Phone, Mail, MapPin, Hash, CreditCard, Calendar, FileEdit, Sparkles } from "lucide-react";
+import { X, Save, Edit, Building2, User, Phone, Mail, MapPin, Hash, CreditCard, Calendar, FileEdit, Sparkles, Loader2 } from "lucide-react";
 import { useState, useEffect } from "react";
+import { WarehouseApi } from "@/lib/features/warehouse/api";
+import { Supplier } from "@/lib/features/warehouse/types";
+import { toast } from "sonner";
 
 interface SupplierFormModalProps {
   open: boolean;
   onClose: () => void;
-  supplier?: any;
-  onSuccess?: (saved?: any) => void;  
+  supplier?: Supplier | null;
+  onSuccess?: () => void;  
 }
 
-
-// ✅ DÉPLACER CES COMPOSANTS EN DEHORS
 const InputGroup = ({
   icon: Icon,
   label,
@@ -116,43 +117,59 @@ const StepIndicator = ({ number, title, active }: any) => (
   </div>
 );
 
-// ✅ COMPOSANT PRINCIPAL
-export default function SupplierFormModal({ open, onClose, supplier }: SupplierFormModalProps) {
+export default function SupplierFormModal({ open, onClose, supplier, onSuccess }: SupplierFormModalProps) {
   const isEditMode = !!supplier;
   const [activeStep, setActiveStep] = useState(1);
+  const [loading, setLoading] = useState(false);
 
-const [formData, setFormData] = useState({
-  name: "",
-  contact: "",       // ✅ camelCase
-  phone: "",
-  email: "",
-  address: "",
-  nif: "",
-  rc: "",
-  iban: "",
-  paymentMode: "",   // ✅ camelCase
-  delay: "",         // ✅ camelCase
-  note: "",          // ✅ camelCase
-});
-
+  // ✅ UTILISER snake_case pour correspondre à l'API
+  const [formData, setFormData] = useState({
+    name: "",
+    contact_name: "",
+    phone: "",
+    email: "",
+    address: "",
+    nif: "",
+    rc: "",
+    iban: "",
+    payment_mode: "",
+    payment_delay: "",
+    notes: "",
+  });
 
   useEffect(() => {
     if (supplier) {
       setFormData({
         name: supplier.name || "",
-        contact: supplier.contact || "",
+        contact_name: supplier.contact_name || "",
         phone: supplier.phone || "",
         email: supplier.email || "",
         address: supplier.address || "",
         nif: supplier.nif || "",
         rc: supplier.rc || "",
         iban: supplier.iban || "",
-        paymentMode: supplier.paymentMode || "",
-        delay: supplier.delay || "",
-        note: supplier.note || "",
+        payment_mode: supplier.payment_mode || "",
+        payment_delay: supplier.payment_delay?.toString() || "",
+        notes: supplier.notes || "",
       });
+    } else {
+      // Reset form when creating new supplier
+      setFormData({
+        name: "",
+        contact_name: "",
+        phone: "",
+        email: "",
+        address: "",
+        nif: "",
+        rc: "",
+        iban: "",
+        payment_mode: "",
+        payment_delay: "",
+        notes: "",
+      });
+      setActiveStep(1);
     }
-  }, [supplier]);
+  }, [supplier, open]);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
@@ -160,14 +177,45 @@ const [formData, setFormData] = useState({
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isEditMode) {
-      console.log("Fournisseur mis à jour :", formData);
-    } else {
-      console.log("Nouveau fournisseur ajouté :", formData);
+    setLoading(true);
+
+    try {
+      // Préparer les données pour l'API
+      const payload: Partial<Supplier> = {
+        name: formData.name,
+        contact_name: formData.contact_name || undefined,
+        phone: formData.phone || undefined,
+        email: formData.email || null,
+        address: formData.address || undefined,
+        nif: formData.nif || undefined,
+        rc: formData.rc || undefined,
+        iban: formData.iban || undefined,
+        payment_mode: (formData.payment_mode as any) || undefined,
+        payment_delay: formData.payment_delay ? parseInt(formData.payment_delay) : undefined,
+        notes: formData.notes || undefined,
+      };
+
+      if (isEditMode && supplier?.id) {
+        // Mettre à jour
+        await WarehouseApi.suppliers.update(supplier.id, payload);
+        toast.success("Fournisseur modifié avec succès");
+      } else {
+        // Créer nouveau
+        await WarehouseApi.suppliers.create(payload);
+        toast.success("Fournisseur créé avec succès");
+      }
+
+      // Appeler onSuccess pour rafraîchir la liste
+      onSuccess?.();
+      onClose();
+    } catch (error: any) {
+      console.error("Erreur lors de la sauvegarde:", error);
+      toast.error(error?.message || "Erreur lors de la sauvegarde du fournisseur");
+    } finally {
+      setLoading(false);
     }
-    onClose();
   };
 
   if (!open) return null;
@@ -203,7 +251,8 @@ const [formData, setFormData] = useState({
               
               <button
                 onClick={onClose}
-                className="p-2.5 rounded-xl text-white/80 hover:text-white hover:bg-white/20 backdrop-blur-sm transition-all duration-200 hover:scale-110"
+                disabled={loading}
+                className="p-2.5 rounded-xl text-white/80 hover:text-white hover:bg-white/20 backdrop-blur-sm transition-all duration-200 hover:scale-110 disabled:opacity-50"
                 title="Fermer"
               >
                 <X className="w-6 h-6" />
@@ -251,8 +300,8 @@ const [formData, setFormData] = useState({
                       <InputGroup
                         icon={User}
                         label="Contact principal"
-                        name="contact"
-                        value={formData.contact}
+                        name="contact_name"
+                        value={formData.contact_name}
                         onChange={handleChange}
                         placeholder="ex: Ahmed Benali"
                       />
@@ -377,8 +426,8 @@ const [formData, setFormData] = useState({
                       <SelectGroup
                         icon={CreditCard}
                         label="Mode de paiement"
-                        name="paymentMode"
-                        value={formData.paymentMode}
+                        name="payment_mode"
+                        value={formData.payment_mode}
                         onChange={handleChange}
                         options={[
                           { value: "cash", label: "Espèces" },
@@ -391,9 +440,9 @@ const [formData, setFormData] = useState({
                       <InputGroup
                         icon={Calendar}
                         label="Délai de paiement"
-                        name="delay"
+                        name="payment_delay"
                         type="number"
-                        value={formData.delay}
+                        value={formData.payment_delay}
                         onChange={handleChange}
                         placeholder="ex: 30"
                         description="En jours"
@@ -408,9 +457,9 @@ const [formData, setFormData] = useState({
                         </span>
                       </label>
                       <textarea
-                        name="note"
+                        name="notes"
                         rows={5}
-                        value={formData.note}
+                        value={formData.notes}
                         onChange={handleChange}
                         placeholder="Ajoutez des notes importantes concernant ce fournisseur..."
                         className="w-full px-4 py-3.5 bg-white border-2 border-gray-200 rounded-xl text-sm font-medium text-gray-900 placeholder:text-gray-400 focus:border-purple-500 focus:ring-4 focus:ring-purple-100 focus:outline-none transition-all duration-200 hover:border-gray-300 resize-none"
@@ -423,20 +472,33 @@ const [formData, setFormData] = useState({
                   <button
                     type="button"
                     onClick={() => setActiveStep(2)}
-                    className="px-8 py-3 border-2 border-gray-300 text-gray-700 rounded-xl font-bold hover:bg-gray-50 transition-all duration-200 hover:scale-105"
+                    disabled={loading}
+                    className="px-8 py-3 border-2 border-gray-300 text-gray-700 rounded-xl font-bold hover:bg-gray-50 transition-all duration-200 hover:scale-105 disabled:opacity-50"
                   >
                     ← Retour
                   </button>
                   <button
                     type="submit"
-                    className={`flex items-center space-x-2 px-8 py-3 rounded-xl font-bold text-white shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105 ${
+                    disabled={loading}
+                    className={`flex items-center space-x-2 px-8 py-3 rounded-xl font-bold text-white shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed ${
                       isEditMode
                         ? "bg-gradient-to-r from-amber-600 to-orange-600"
                         : "bg-gradient-to-r from-green-600 to-emerald-600"
                     }`}
                   >
-                    <Save className="w-5 h-5" />
-                    <span>{isEditMode ? "Mettre à jour" : "Enregistrer le fournisseur"}</span>
+                    {loading ? (
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                    ) : (
+                      <Save className="w-5 h-5" />
+                    )}
+                    <span>
+                      {loading 
+                        ? "Enregistrement..." 
+                        : isEditMode 
+                        ? "Mettre à jour" 
+                        : "Enregistrer le fournisseur"
+                      }
+                    </span>
                   </button>
                 </div>
               </div>

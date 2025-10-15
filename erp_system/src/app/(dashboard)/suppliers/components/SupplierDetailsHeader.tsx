@@ -1,12 +1,42 @@
 "use client";
 
-import { Building2, MapPin, Phone, Mail, Hash, CreditCard } from "lucide-react";
+import { Building2, MapPin, Phone, Mail, Hash, CreditCard, Calendar, FileText } from "lucide-react";
+import { Supplier } from "@/lib/features/warehouse/types";
+import { usePurchaseOrders } from "@/lib/features/warehouse/hooks";
+import { useMemo } from "react";
 
 interface SupplierDetailsHeaderProps {
-  supplier: any;
+  supplier: Supplier | null;
 }
 
 export default function SupplierDetailsHeader({ supplier }: SupplierDetailsHeaderProps) {
+  const { orders } = usePurchaseOrders();
+
+  // Calculate supplier statistics from real data
+  const stats = useMemo(() => {
+    if (!supplier?.id) return { orderCount: 0, invoiceCount: 0, lastOrderDate: null, balance: 0 };
+
+    const supplierOrders = orders.filter(o => o.supplier === supplier.id);
+    const orderCount = supplierOrders.length;
+    
+    // Count received orders as invoices
+    const invoiceCount = supplierOrders.filter(o => o.status === 'received').length;
+    
+    // Get last order date
+    const lastOrderDate = supplierOrders.length > 0
+      ? supplierOrders.sort((a, b) => 
+          new Date(b.order_date).getTime() - new Date(a.order_date).getTime()
+        )[0].order_date
+      : null;
+    
+    // Calculate balance (pending orders = debt)
+    const balance = supplierOrders
+      .filter(o => ['sent', 'confirmed'].includes(o.status))
+      .reduce((sum, o) => sum + parseFloat(o.total_amount || '0'), 0);
+
+    return { orderCount, invoiceCount, lastOrderDate, balance };
+  }, [supplier?.id, orders]);
+
   if (!supplier) return null;
 
   const InfoItem = ({ 
@@ -17,7 +47,7 @@ export default function SupplierDetailsHeader({ supplier }: SupplierDetailsHeade
   }: {
     icon: any;
     label: string;
-    value: string;
+    value: string | null | undefined;
     color?: string;
   }) => (
     <div className="flex items-start space-x-3 group">
@@ -49,6 +79,22 @@ export default function SupplierDetailsHeader({ supplier }: SupplierDetailsHeade
     );
   };
 
+  const paymentModeLabels: Record<string, string> = {
+    cash: 'Espèces',
+    bank: 'Virement bancaire',
+    check: 'Chèque',
+    credit: 'Crédit',
+  };
+
+  const formatDate = (dateString: string | null) => {
+    if (!dateString) return '—';
+    return new Date(dateString).toLocaleDateString('fr-FR', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric'
+    });
+  };
+
   return (
     <div className="relative overflow-hidden">
       {/* Decorative background gradient */}
@@ -68,14 +114,24 @@ export default function SupplierDetailsHeader({ supplier }: SupplierDetailsHeade
               <h3 className="text-2xl font-bold text-gray-900 mb-1">
                 {supplier.name}
               </h3>
-              <p className="text-sm text-gray-600">
-                Fournisseur #{supplier.id || "N/A"}
-              </p>
+              <div className="flex items-center space-x-3">
+                <p className="text-sm text-gray-600">
+                  Fournisseur #{supplier.id}
+                </p>
+                {supplier.contact_name && (
+                  <>
+                    <span className="text-gray-300">•</span>
+                    <p className="text-sm text-gray-600">
+                      Contact: {supplier.contact_name}
+                    </p>
+                  </>
+                )}
+              </div>
             </div>
           </div>
 
           {/* Badge de statut */}
-          <StatusBadge balance={supplier.balance || 0} />
+          <StatusBadge balance={stats.balance} />
         </div>
 
         {/* Grille d'informations */}
@@ -101,13 +157,13 @@ export default function SupplierDetailsHeader({ supplier }: SupplierDetailsHeade
         </div>
 
         {/* Informations fiscales et bancaires */}
-        <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="mt-4 grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="bg-white/60 backdrop-blur-sm rounded-xl p-4 border border-white/50 shadow-sm">
             <div className="flex items-center space-x-2 mb-2">
               <Hash className="w-4 h-4 text-amber-600" />
               <span className="text-xs font-semibold text-gray-600 uppercase">NIF</span>
             </div>
-            <p className="text-lg font-bold text-gray-900">{supplier.nif || "—"}</p>
+            <p className="text-sm font-bold text-gray-900">{supplier.nif || "—"}</p>
           </div>
 
           <div className="bg-white/60 backdrop-blur-sm rounded-xl p-4 border border-white/50 shadow-sm">
@@ -115,7 +171,7 @@ export default function SupplierDetailsHeader({ supplier }: SupplierDetailsHeade
               <Hash className="w-4 h-4 text-blue-600" />
               <span className="text-xs font-semibold text-gray-600 uppercase">RC</span>
             </div>
-            <p className="text-lg font-bold text-gray-900">{supplier.rc || "—"}</p>
+            <p className="text-sm font-bold text-gray-900">{supplier.rc || "—"}</p>
           </div>
 
           <div className="bg-white/60 backdrop-blur-sm rounded-xl p-4 border border-white/50 shadow-sm">
@@ -123,32 +179,63 @@ export default function SupplierDetailsHeader({ supplier }: SupplierDetailsHeade
               <CreditCard className="w-4 h-4 text-green-600" />
               <span className="text-xs font-semibold text-gray-600 uppercase">IBAN / RIB</span>
             </div>
-            <p className="text-sm font-bold text-gray-900 truncate">{supplier.iban || "—"}</p>
+            <p className="text-xs font-bold text-gray-900 truncate">{supplier.iban || "—"}</p>
+          </div>
+
+          <div className="bg-white/60 backdrop-blur-sm rounded-xl p-4 border border-white/50 shadow-sm">
+            <div className="flex items-center space-x-2 mb-2">
+              <CreditCard className="w-4 h-4 text-purple-600" />
+              <span className="text-xs font-semibold text-gray-600 uppercase">Paiement</span>
+            </div>
+            <p className="text-sm font-bold text-gray-900">
+              {supplier.payment_mode ? paymentModeLabels[supplier.payment_mode] : "—"}
+            </p>
+            {supplier.payment_delay && (
+              <p className="text-xs text-gray-600 mt-1">
+                Délai: {supplier.payment_delay}j
+              </p>
+            )}
           </div>
         </div>
 
         {/* Statistiques rapides */}
         <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3">
           <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-3 text-white shadow-lg">
-            <p className="text-xs font-medium opacity-90 mb-1">Solde</p>
-            <p className="text-lg font-bold">{(supplier.balance || 0).toLocaleString()} DA</p>
+            <p className="text-xs font-medium opacity-90 mb-1">Solde dû</p>
+            <p className="text-lg font-bold">
+              {stats.balance.toLocaleString('fr-FR', {
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 0
+              })} DA
+            </p>
           </div>
           
           <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-3 text-white shadow-lg">
             <p className="text-xs font-medium opacity-90 mb-1">Commandes</p>
-            <p className="text-lg font-bold">12</p>
+            <p className="text-lg font-bold">{stats.orderCount}</p>
           </div>
           
           <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl p-3 text-white shadow-lg">
-            <p className="text-xs font-medium opacity-90 mb-1">Factures</p>
-            <p className="text-lg font-bold">8</p>
+            <p className="text-xs font-medium opacity-90 mb-1">Reçues</p>
+            <p className="text-lg font-bold">{stats.invoiceCount}</p>
           </div>
           
           <div className="bg-gradient-to-br from-amber-500 to-amber-600 rounded-xl p-3 text-white shadow-lg">
             <p className="text-xs font-medium opacity-90 mb-1">Dernière commande</p>
-            <p className="text-sm font-bold">{supplier.lastOrder || "—"}</p>
+            <p className="text-sm font-bold">{formatDate(stats.lastOrderDate)}</p>
           </div>
         </div>
+
+        {/* Notes section */}
+        {supplier.notes && (
+          <div className="mt-4 bg-white/60 backdrop-blur-sm rounded-xl p-4 border border-white/50 shadow-sm">
+            <div className="flex items-center space-x-2 mb-2">
+              <FileText className="w-4 h-4 text-gray-600" />
+              <span className="text-xs font-semibold text-gray-600 uppercase">Notes</span>
+            </div>
+            <p className="text-sm text-gray-700 whitespace-pre-wrap">{supplier.notes}</p>
+          </div>
+        )}
       </div>
     </div>
   );

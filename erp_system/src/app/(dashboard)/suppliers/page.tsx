@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   Users,
   Plus,
@@ -30,7 +30,7 @@ import SupplierPaymentsModal from "./components/SupplierPaymentsModal";
 import SupplierOrderModal from "./components/SupplierOrderModal";
 import SupplierStatsChart from "./components/Charts/SupplierStatsChart";
 import SupplierEvolutionChart from "./components/Charts/SupplierEvolutionChart";
-import { useSuppliers } from "@/lib/features/warehouse/hooks";
+import { useSuppliers, usePurchaseOrders, useSupplierStatistics } from "@/lib/features/warehouse/hooks";
 import { Supplier } from "@/lib/features/warehouse/types";
 import { toast } from "sonner";
 
@@ -40,11 +40,8 @@ type StatCardProps = {
   value: string;
   change: string;
   changeType: "positive" | "negative";
-  /** Example: "from-blue-500 to-blue-600" (consider safelisting in Tailwind) */
   gradient: string;
 };
-
-
 
 const StatCard = ({
   icon,
@@ -55,11 +52,9 @@ const StatCard = ({
   gradient,
 }: StatCardProps) => (
   <div className="group relative bg-white p-6 rounded-2xl border border-gray-200 shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden">
-    {/* Gradient background on hover */}
     <div
       className={`absolute inset-0 bg-gradient-to-br ${gradient} opacity-0 group-hover:opacity-5 transition-opacity duration-300`}
     />
-    {/* Decorative circle */}
     <div className="absolute -top-10 -right-10 w-32 h-32 bg-blue-50 rounded-full opacity-20 group-hover:scale-150 transition-transform duration-500" />
 
     <div className="relative z-10">
@@ -108,12 +103,12 @@ const ActionButton = ({
   onClick,
   variant = "default",
 }: ActionButtonProps) => {
-const variants: Record<Variant, string> = {
-  default:
-    "border border-gray-300 hover:border-gray-400 bg-white hover:bg-gray-50 text-gray-700 shadow-sm",
-  primary:
-    "bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg shadow-blue-200 hover:shadow-xl hover:shadow-blue-300",
-};
+  const variants: Record<Variant, string> = {
+    default:
+      "border border-gray-300 hover:border-gray-400 bg-white hover:bg-gray-50 text-gray-700 shadow-sm",
+    primary:
+      "bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg shadow-blue-200 hover:shadow-xl hover:shadow-blue-300",
+  };
   return (
     <button
       onClick={onClick}
@@ -129,7 +124,7 @@ type QuickActionCardProps = {
   icon: React.ComponentType<{ className?: string }>;
   title: string;
   count: string | number;
-  color: string; // e.g. "bg-blue-500"
+  color: string;
   onClick: () => void;
 };
 
@@ -162,8 +157,10 @@ const QuickActionCard = ({
 export default function SuppliersDashboard() {
   // Hooks API
   const { suppliers, loading, error, refresh, isValidating } = useSuppliers();
+  const { orders } = usePurchaseOrders();
+  const { statistics: supplierStats } = useSupplierStatistics();
 
-  // Safeguards (avoid undefined access)
+  // Safeguards
   const suppliersList: Supplier[] = Array.isArray(suppliers) ? suppliers : [];
   const validating = Boolean(isValidating ?? loading);
 
@@ -178,11 +175,72 @@ export default function SuppliersDashboard() {
   const [isOrderOpen, setIsOrderOpen] = useState(false);
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
 
-  // Calculer les stats
-  const totalSuppliers = suppliersList.length;
-  const activeSuppliers = suppliersList.filter(
-    (s) => (s as any).materials_count && (s as any).materials_count > 0
-  ).length;
+  // Calculate real statistics
+  const stats = useMemo(() => {
+    const totalSuppliers = suppliersList.length;
+    const activeSuppliers = suppliersList.filter(
+      (s) => s.materials_count && s.materials_count > 0
+    ).length;
+
+    // Calculate balance due (pending orders)
+    const balanceDue = orders
+      .filter(o => ['sent', 'confirmed'].includes(o.status))
+      .reduce((sum, o) => sum + parseFloat(o.total_amount || '0'), 0);
+
+    // Active orders (not received or cancelled)
+    const activeOrders = orders.filter(
+      o => !['received', 'cancelled'].includes(o.status)
+    ).length;
+
+    // This month's purchases
+    const currentMonth = new Date().getMonth();
+    const currentYear = new Date().getFullYear();
+    const thisMonthPurchases = orders
+      .filter(o => {
+        const orderDate = new Date(o.order_date);
+        return orderDate.getMonth() === currentMonth && 
+               orderDate.getFullYear() === currentYear;
+      })
+      .reduce((sum, o) => sum + parseFloat(o.total_amount || '0'), 0);
+
+    // Quick action counts
+    const receivedOrders = orders.filter(o => o.status === 'received').length;
+    const pendingPayments = orders.filter(o => ['sent', 'confirmed'].includes(o.status)).length;
+    const expectedDeliveries = orders.filter(o => {
+      if (!o.expected_delivery_date || o.status === 'received') return false;
+      const deliveryDate = new Date(o.expected_delivery_date);
+      const now = new Date();
+      return deliveryDate >= now;
+    }).length;
+
+    return {
+      totalSuppliers,
+      activeSuppliers,
+      balanceDue,
+      activeOrders,
+      thisMonthPurchases,
+      receivedOrders,
+      pendingPayments,
+      expectedDeliveries,
+    };
+  }, [suppliersList, orders]);
+
+  // Format numbers
+  const formatCurrency = (amount: number) => {
+    if (amount >= 1000000) {
+      return `${(amount / 1000000).toFixed(2)}M DA`;
+    } else if (amount >= 1000) {
+      return `${(amount / 1000).toFixed(0)}K DA`;
+    }
+    return `${amount.toFixed(0)} DA`;
+  };
+
+  // Calculate percentage change (mock for now - would need historical data)
+  const calculateChange = (current: number, previous: number) => {
+    if (previous === 0) return "+100%";
+    const change = ((current - previous) / previous) * 100;
+    return `${change > 0 ? '+' : ''}${change.toFixed(0)}%`;
+  };
 
   // Loading state
   if (loading && suppliersList.length === 0) {
@@ -256,62 +314,62 @@ export default function SuppliersDashboard() {
           </div>
         </div>
 
-        {/* Stats Grid */}
+        {/* Stats Grid - Real Data */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <StatCard
             icon={<Users className="w-6 h-6 text-white" />}
             title="Total fournisseurs"
-            value={totalSuppliers.toString()}
-            change={`${activeSuppliers} actifs`}
+            value={stats.totalSuppliers.toString()}
+            change={`${stats.activeSuppliers} actifs`}
             changeType="positive"
             gradient="from-blue-500 to-blue-600"
           />
           <StatCard
             icon={<CreditCard className="w-6 h-6 text-white" />}
             title="Solde dû"
-            value="390K DA"
-            change="-8%"
-            changeType="positive"
+            value={formatCurrency(stats.balanceDue)}
+            change={stats.balanceDue === 0 ? "Aucune dette" : `${stats.pendingPayments} en attente`}
+            changeType={stats.balanceDue === 0 ? "positive" : "negative"}
             gradient="from-amber-500 to-orange-600"
           />
           <StatCard
             icon={<ShoppingBag className="w-6 h-6 text-white" />}
             title="Commandes actives"
-            value="12"
-            change="+5"
+            value={stats.activeOrders.toString()}
+            change={`${stats.receivedOrders} reçues`}
             changeType="positive"
             gradient="from-green-500 to-emerald-600"
           />
           <StatCard
             icon={<DollarSign className="w-6 h-6 text-white" />}
             title="Achats ce mois"
-            value="2.45M DA"
-            change="+15%"
+            value={formatCurrency(stats.thisMonthPurchases)}
+            change={stats.thisMonthPurchases > 0 ? "En cours" : "Aucun achat"}
             changeType="positive"
             gradient="from-purple-500 to-purple-600"
           />
         </div>
 
-        {/* Quick Actions */}
+        {/* Quick Actions - Real Data */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <QuickActionCard
             icon={FileText}
-            title="Factures en attente"
-            count="8"
+            title="Factures reçues"
+            count={stats.receivedOrders}
             color="bg-blue-500"
             onClick={() => toast.info("Fonctionnalité à venir")}
           />
           <QuickActionCard
             icon={AlertCircle}
-            title="Paiements en retard"
-            count="3"
+            title="Paiements en attente"
+            count={stats.pendingPayments}
             color="bg-red-500"
             onClick={() => toast.info("Fonctionnalité à venir")}
           />
           <QuickActionCard
             icon={Package}
             title="Livraisons prévues"
-            count="5"
+            count={stats.expectedDeliveries}
             color="bg-green-500"
             onClick={() => toast.info("Fonctionnalité à venir")}
           />
@@ -342,9 +400,9 @@ export default function SuppliersDashboard() {
                   <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
                 )}
                 <span className="text-sm font-semibold text-gray-700">
-                  {totalSuppliers} fournisseur{totalSuppliers > 1 ? "s" : ""}{" "}
-                  {activeSuppliers > 0 &&
-                    `(${activeSuppliers} actif${activeSuppliers > 1 ? "s" : ""})`}
+                  {stats.totalSuppliers} fournisseur{stats.totalSuppliers > 1 ? "s" : ""}{" "}
+                  {stats.activeSuppliers > 0 &&
+                    `(${stats.activeSuppliers} actif${stats.activeSuppliers > 1 ? "s" : ""})`}
                 </span>
               </div>
             </div>

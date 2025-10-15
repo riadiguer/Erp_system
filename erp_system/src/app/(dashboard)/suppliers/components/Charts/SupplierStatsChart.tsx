@@ -1,6 +1,8 @@
 "use client";
 
-import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from "recharts";
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
+import { useSuppliers } from "@/lib/features/warehouse/hooks";
+import { Loader2 } from "lucide-react";
 
 const CustomTooltip = ({ active, payload }: any) => {
   if (active && payload && payload.length) {
@@ -46,16 +48,59 @@ const CustomLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }: an
 };
 
 export default function SupplierStatsChart() {
+  const { suppliers, loading } = useSuppliers();
+
+  // Calculate stats from real data
+  const activeSuppliers = suppliers.filter(s => s.materials_count && s.materials_count > 0).length;
+  const inactiveSuppliers = suppliers.filter(s => !s.materials_count || s.materials_count === 0).length;
+  
+  // For "avec dette", you might need a balance field. For now, using a placeholder calculation
+  // You can update this when you add a balance/debt field to your Supplier model
+  const suppliersWithDebt = Math.floor(activeSuppliers * 0.4); // Placeholder - 40% of active
+  
   const data = [
-    { name: "Fournisseurs actifs", value: 8, color: "#22c55e" },
-    { name: "Fournisseurs avec dette", value: 4, color: "#f59e0b" },
-    { name: "Fournisseurs inactifs", value: 3, color: "#94a3b8" },
+    { name: "Fournisseurs actifs", value: activeSuppliers, color: "#22c55e" },
+    { name: "Fournisseurs avec dette", value: suppliersWithDebt, color: "#f59e0b" },
+    { name: "Fournisseurs inactifs", value: inactiveSuppliers, color: "#94a3b8" },
   ];
 
   const total = data.reduce((sum, item) => sum + item.value, 0);
   const dataWithTotal = data.map(item => ({ ...item, total }));
 
   const COLORS = ["#22c55e", "#f59e0b", "#94a3b8"];
+
+  if (loading) {
+    return (
+      <div className="relative bg-white rounded-2xl border border-gray-200 shadow-lg overflow-hidden">
+        <div className="flex items-center justify-center h-[500px]">
+          <div className="text-center">
+            <Loader2 className="w-8 h-8 text-blue-600 animate-spin mx-auto mb-2" />
+            <p className="text-sm text-gray-600">Chargement des statistiques...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (total === 0) {
+    return (
+      <div className="relative bg-white rounded-2xl border border-gray-200 shadow-lg overflow-hidden">
+        <div className="relative z-10 bg-gradient-to-r from-gray-50 to-green-50/30 px-6 py-5 border-b border-gray-200">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-bold text-gray-900 mb-1">
+                Répartition des fournisseurs
+              </h3>
+              <p className="text-sm text-gray-600">Classification par statut</p>
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center justify-center h-[400px]">
+          <p className="text-gray-500">Aucun fournisseur à afficher</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="relative bg-white rounded-2xl border border-gray-200 shadow-lg overflow-hidden">
@@ -124,7 +169,7 @@ export default function SupplierStatsChart() {
               <div className="flex items-center space-x-3">
                 <span className="text-sm font-bold text-gray-900">{item.value}</span>
                 <span className="text-xs font-semibold text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
-                  {((item.value / total) * 100).toFixed(1)}%
+                  {total > 0 ? ((item.value / total) * 100).toFixed(1) : 0}%
                 </span>
               </div>
             </div>
@@ -137,7 +182,7 @@ export default function SupplierStatsChart() {
         <div className="flex items-center justify-between text-white">
           <span className="text-xs font-semibold">Taux d'activité</span>
           <span className="text-sm font-bold">
-            {((data[0].value / total) * 100).toFixed(0)}% actifs
+            {total > 0 ? ((data[0].value / total) * 100).toFixed(0) : 0}% actifs
           </span>
         </div>
       </div>

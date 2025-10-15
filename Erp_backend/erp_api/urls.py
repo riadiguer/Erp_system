@@ -23,4 +23,5 @@ urlpatterns = [
     path("api/", include("accounts.urls")),  # our API
     path('api/sales/', include('sales.urls')),
     path('api/warehouse/', include('warehouse.urls')),  # Warehouse API - NOUVEAU
+    path('api/customers/', include('customers.urls')),  # Customers API - NOUVEAU
 ]

@@ -7,7 +7,9 @@ interface SupplierFormModalProps {
   open: boolean;
   onClose: () => void;
   supplier?: any;
+  onSuccess?: (saved?: any) => void;  
 }
+
 
 // ✅ DÉPLACER CES COMPOSANTS EN DEHORS
 const InputGroup = ({
@@ -119,19 +121,20 @@ export default function SupplierFormModal({ open, onClose, supplier }: SupplierF
   const isEditMode = !!supplier;
   const [activeStep, setActiveStep] = useState(1);
 
-  const [formData, setFormData] = useState({
-    name: "",
-    contact: "",
-    phone: "",
-    email: "",
-    address: "",
-    nif: "",
-    rc: "",
-    iban: "",
-    paymentMode: "",
-    delay: "",
-    note: "",
-  });
+const [formData, setFormData] = useState({
+  name: "",
+  contact: "",       // ✅ camelCase
+  phone: "",
+  email: "",
+  address: "",
+  nif: "",
+  rc: "",
+  iban: "",
+  paymentMode: "",   // ✅ camelCase
+  delay: "",         // ✅ camelCase
+  note: "",          // ✅ camelCase
+});
+
 
   useEffect(() => {
     if (supplier) {

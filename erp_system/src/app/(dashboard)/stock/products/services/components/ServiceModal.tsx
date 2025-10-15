@@ -7,35 +7,58 @@ import {
   Briefcase,
   TrendingUp,
   Calendar,
-  Users,
   DollarSign,
   BarChart3,
   AlertCircle,
   CheckCircle,
   Tag,
   Box,
-  Clock,
+  Layers,
 } from "lucide-react";
+import { type Product } from "@/lib/features/sales/api";
+
+interface ServiceModalProps {
+  service: Product | null;
+  onClose: () => void;
+  onEdit: (service: Product) => void;
+  onDelete: () => void;
+}
 
 export default function ServiceModal({
   service,
   onClose,
   onEdit,
   onDelete,
-}) {
+}: ServiceModalProps) {
   if (!service) return null;
 
+  const stockQty = parseFloat(service.stock_qty || "0");
+  const unitPrice = parseFloat(service.unit_price || "0");
+  const taxRate = parseFloat(service.tax_rate || "0");
+  const minStock = 5; // Threshold for services
+  
   const mockStats = {
-    totalSales: 7,
-    totalDemand: 11,
-    lastMovement: "2024-09-20",
-    avgMonthlyConsumption: 2,
-    lastBooking: "2024-09-18",
-    totalValue: service.stock * service.price,
+    totalSales: 12,
+    totalDemand: 19,
+    lastMovement: service.updated_at,
+    avgMonthlyUsage: 4,
+    lastUpdate: service.created_at,
+    totalValue: stockQty * unitPrice,
   };
 
   const getStockStatus = () => {
-    const percentage = (service.stock / service.minStock) * 100;
+    if (!service.track_stock) {
+      return {
+        status: "Non suivi",
+        color: "gray",
+        icon: <Briefcase className="w-5 h-5" />,
+        bgColor: "bg-gray-50",
+        textColor: "text-gray-700",
+        borderColor: "border-gray-200",
+      };
+    }
+
+    const percentage = (stockQty / minStock) * 100;
     if (percentage < 50)
       return {
         status: "Critique",
@@ -65,9 +88,9 @@ export default function ServiceModal({
   };
 
   const stockStatus = getStockStatus();
-  const percentage = Math.round((service.stock / service.minStock) * 100);
+  const percentage = service.track_stock ? Math.round((stockQty / minStock) * 100) : 100;
 
-  const demandData = [35, 42, 38, 50, 55, 60, 48, 55, 62, 58, 65, 70];
+  const salesData = [45, 52, 48, 60, 65, 70, 58, 65, 72, 68, 75, 80];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
@@ -95,13 +118,21 @@ export default function ServiceModal({
                 <div className="flex items-center space-x-4 text-sm text-white/90">
                   <span className="flex items-center">
                     <Tag className="w-4 h-4 mr-1" />
-                    {service.reference}
+                    {service.sku}
                   </span>
                   <span>•</span>
                   <span className="flex items-center">
                     <Box className="w-4 h-4 mr-1" />
-                    {service.category}
+                    {service.unit || "N/A"}
                   </span>
+                  {!service.is_active && (
+                    <>
+                      <span>•</span>
+                      <span className="flex items-center bg-white/20 px-2 py-1 rounded">
+                        Inactif
+                      </span>
+                    </>
+                  )}
                 </div>
               </div>
               <div
@@ -112,24 +143,26 @@ export default function ServiceModal({
               </div>
             </div>
 
-            <div className="bg-white/20 backdrop-blur-sm rounded-lg p-4">
-              <div className="flex items-center justify-between mb-2 text-sm">
-                <span>Capacité disponible</span>
-                <span className="font-bold">
-                  {service.stock} / {service.minStock} {service.unit}
-                </span>
+            {service.track_stock && (
+              <div className="bg-white/20 backdrop-blur-sm rounded-lg p-4">
+                <div className="flex items-center justify-between mb-2 text-sm">
+                  <span>Capacité disponible</span>
+                  <span className="font-bold">
+                    {stockQty || 0} {service.unit || "unité"}
+                  </span>
+                </div>
+                <div className="w-full bg-white/30 rounded-full h-3 overflow-hidden">
+                  <div
+                    className="h-full bg-white rounded-full transition-all duration-500"
+                    style={{ width: `${Math.min(percentage, 100)}%` }}
+                  />
+                </div>
+                <div className="flex justify-between mt-2 text-xs text-white/80">
+                  <span>{percentage}% de la capacité</span>
+                  <span>Valeur: {(mockStats.totalValue || 0).toLocaleString("fr-DZ")} DA</span>
+                </div>
               </div>
-              <div className="w-full bg-white/30 rounded-full h-3 overflow-hidden">
-                <div
-                  className="h-full bg-white rounded-full transition-all duration-500"
-                  style={{ width: `${Math.min(percentage, 100)}%` }}
-                />
-              </div>
-              <div className="flex justify-between mt-2 text-xs text-white/80">
-                <span>{percentage}% de la capacité min.</span>
-                <span>Valeur: {mockStats.totalValue.toLocaleString()} DA</span>
-              </div>
-            </div>
+            )}
           </div>
         </div>
 
@@ -139,13 +172,13 @@ export default function ServiceModal({
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
             <div className="bg-blue-50 rounded-xl p-4 border border-blue-200">
               <div className="flex items-center justify-between mb-2">
-                <Users className="w-5 h-5 text-blue-600" />
+                <Briefcase className="w-5 h-5 text-blue-600" />
                 <span className="text-xs font-medium text-blue-600">VENTES</span>
               </div>
               <div className="text-2xl font-bold text-gray-900">
                 {mockStats.totalSales}
               </div>
-              <div className="text-xs text-gray-600 mt-1">Services vendus</div>
+              <div className="text-xs text-gray-600 mt-1">Total réalisés</div>
             </div>
 
             <div className="bg-green-50 rounded-xl p-4 border border-green-200">
@@ -165,21 +198,21 @@ export default function ServiceModal({
                 <span className="text-xs font-medium text-purple-600">DERNIER</span>
               </div>
               <div className="text-2xl font-bold text-gray-900">
-                {new Date(mockStats.lastBooking).toLocaleDateString("fr-FR", {
+                {new Date(mockStats.lastMovement).toLocaleDateString("fr-FR", {
                   day: "2-digit",
                   month: "short",
                 })}
               </div>
-              <div className="text-xs text-gray-600 mt-1">Réservation</div>
+              <div className="text-xs text-gray-600 mt-1">Mouvement</div>
             </div>
 
             <div className="bg-orange-50 rounded-xl p-4 border border-orange-200">
               <div className="flex items-center justify-between mb-2">
-                <Clock className="w-5 h-5 text-orange-600" />
+                <BarChart3 className="w-5 h-5 text-orange-600" />
                 <span className="text-xs font-medium text-orange-600">MENSUEL</span>
               </div>
               <div className="text-2xl font-bold text-gray-900">
-                {mockStats.avgMonthlyConsumption}
+                {mockStats.avgMonthlyUsage}
               </div>
               <div className="text-xs text-gray-600 mt-1">Utilisation moy.</div>
             </div>
@@ -189,10 +222,10 @@ export default function ServiceModal({
           <div className="bg-gray-50 rounded-xl p-4 mb-6 border border-gray-200">
             <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center">
               <BarChart3 className="w-4 h-4 mr-2 text-indigo-600" />
-              Évolution de la demande (12 derniers mois)
+              Évolution des prestations (12 derniers mois)
             </h3>
             <div className="flex items-end justify-between h-32 space-x-2">
-              {demandData.map((value, index) => (
+              {salesData.map((value, index) => (
                 <div
                   key={index}
                   className="flex-1 bg-gradient-to-t from-indigo-600 to-indigo-400 rounded-t-lg transition-all hover:from-indigo-700 hover:to-indigo-500 relative group"
@@ -219,27 +252,33 @@ export default function ServiceModal({
               </h3>
               <div className="space-y-3">
                 <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Référence</span>
+                  <span className="text-sm text-gray-600">Référence (SKU)</span>
                   <span className="text-sm font-medium text-gray-900">
-                    {service.reference}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Catégorie</span>
-                  <span className="text-sm font-medium text-gray-900 bg-indigo-100 px-2 py-1 rounded">
-                    {service.category}
+                    {service.sku}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-sm text-gray-600">Unité</span>
-                  <span className="text-sm font-medium text-gray-900">
-                    {service.unit}
+                  <span className="text-sm font-medium text-gray-900 bg-indigo-100 px-2 py-1 rounded">
+                    {service.unit || "N/A"}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Prix unitaire</span>
+                  <span className="text-sm text-gray-600">Prix unitaire HT</span>
                   <span className="text-sm font-medium text-gray-900">
-                    {service.price.toLocaleString()} DA
+                    {(unitPrice || 0).toLocaleString("fr-DZ")} DA
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-gray-600">TVA</span>
+                  <span className="text-sm font-medium text-gray-900">
+                    {taxRate}%
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-gray-600">Prix TTC</span>
+                  <span className="text-sm font-bold text-gray-900">
+                    {((unitPrice * (1 + taxRate / 100)) || 0).toLocaleString("fr-DZ")} DA
                   </span>
                 </div>
               </div>
@@ -247,54 +286,79 @@ export default function ServiceModal({
 
             <div className="space-y-4">
               <h3 className="text-sm font-semibold text-gray-900 flex items-center border-b border-gray-200 pb-2">
-                <Calendar className="w-4 h-4 mr-2 text-indigo-600" />
-                Disponibilité et capacité
+                <Layers className="w-4 h-4 mr-2 text-indigo-600" />
+                Capacité et dates
               </h3>
               <div className="space-y-3">
                 <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Dernière réservation</span>
+                  <span className="text-sm text-gray-600">Suivi de capacité</span>
                   <span className="text-sm font-medium text-gray-900">
-                    {new Date(mockStats.lastBooking).toLocaleDateString("fr-FR")}
+                    {service.track_stock ? "Oui" : "Non"}
+                  </span>
+                </div>
+                {service.track_stock && (
+                  <>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-gray-600">Capacité actuelle</span>
+                      <span className="text-sm font-medium text-gray-900">
+                        {stockQty || 0} {service.unit || "unité"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-gray-600">Valeur totale</span>
+                      <span className="text-sm font-medium text-gray-900">
+                        {(mockStats.totalValue || 0).toLocaleString("fr-DZ")} DA
+                      </span>
+                    </div>
+                  </>
+                )}
+                <div className="flex justify-between">
+                  <span className="text-sm text-gray-600">Créé le</span>
+                  <span className="text-sm font-medium text-gray-900">
+                    {new Date(service.created_at).toLocaleDateString("fr-FR")}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Capacité minimum</span>
+                  <span className="text-sm text-gray-600">Modifié le</span>
                   <span className="text-sm font-medium text-gray-900">
-                    {service.minStock} {service.unit}
+                    {new Date(service.updated_at).toLocaleDateString("fr-FR")}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Capacité actuelle</span>
-                  <span className="text-sm font-medium text-gray-900">
-                    {service.stock} {service.unit}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Valeur totale</span>
-                  <span className="text-sm font-medium text-gray-900">
-                    {mockStats.totalValue.toLocaleString()} DA
+                  <span className="text-sm text-gray-600">Statut</span>
+                  <span className={`text-sm font-medium px-2 py-1 rounded ${
+                    service.is_active 
+                      ? "bg-green-100 text-green-800" 
+                      : "bg-gray-100 text-gray-800"
+                  }`}>
+                    {service.is_active ? "Actif" : "Inactif"}
                   </span>
                 </div>
               </div>
             </div>
           </div>
 
+          {/* Description */}
+          {service.description && (
+            <div className="bg-gray-50 rounded-xl p-4 mb-6 border border-gray-200">
+              <h3 className="text-sm font-semibold text-gray-900 mb-2">Description</h3>
+              <p className="text-sm text-gray-700">{service.description}</p>
+            </div>
+          )}
+
           {/* Alerte capacité basse */}
-          {service.stock < service.minStock && (
+          {service.track_stock && stockQty < minStock && (
             <div className="bg-red-50 border-l-4 border-red-500 rounded-lg p-4 mb-6">
               <div className="flex items-start">
-                <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 mr-3" />
+                <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 mr-3 flex-shrink-0" />
                 <div className="flex-1">
                   <h4 className="text-sm font-semibold text-red-900 mb-1">
                     Capacité insuffisante
                   </h4>
                   <p className="text-sm text-red-700">
-                    La capacité actuelle est inférieure au seuil minimum. Pensez à planifier ce service ou à augmenter la capacité disponible.
+                    La capacité disponible ({stockQty} {service.unit}) est inférieure au seuil recommandé ({minStock} {service.unit}). 
+                    Il est recommandé de planifier la disponibilité.
                   </p>
-                  <button className="mt-3 inline-flex items-center px-3 py-1.5 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors">
-                    <Calendar className="w-4 h-4 mr-2" />
-                    Planifier maintenant
-                  </button>
                 </div>
               </div>
             </div>
@@ -313,15 +377,7 @@ export default function ServiceModal({
                 Modifier
               </button>
               <button
-                onClick={() => {
-                  if (
-                    window.confirm(
-                      `Êtes-vous sûr de vouloir supprimer ${service.name} ?`
-                    )
-                  ) {
-                    onDelete(service.id);
-                  }
-                }}
+                onClick={onDelete}
                 className="inline-flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
               >
                 <Trash2 className="w-4 h-4 mr-2" />

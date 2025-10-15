@@ -190,9 +190,21 @@ export const SalesApi = {
   customers: {
     list: () => get<Customer[]>('/sales/customers/'),
   },
-  products: {
-    list: () => get<Product[]>('/sales/products/'),
-  },
+// products
+products: {
+  list: () => get<Product[]>('/sales/products/'),
+  get: (id: string) => get<Product>(`/sales/products/${id}/`),
+  create: (payload: Partial<Product>) => post<Product>('/sales/products/', payload),
+  update: (id: string, payload: Partial<Product>) => patch<Product>(`/sales/products/${id}/`, payload),
+  remove: (id: string) => del<{}>(`/sales/products/${id}/`),
+  setPrice: (id: string, unit_price: number | string) =>
+    post<Product>(`/sales/products/${id}/set_price/`, { unit_price }),
+  adjustStock: (id: string, delta: number | string, reason?: string) =>
+    post<Product>(`/sales/products/${id}/adjust_stock/`, { delta, reason }),
+  activate: (id: string) => post<{ok: true}>(`/sales/products/${id}/activate/`),
+  deactivate: (id: string) => post<{ok: true}>(`/sales/products/${id}/deactivate/`),
+},
+
 
    salesPoints: {
     list: () => get<SalesPoint[]>('/sales/sales-points/'),
@@ -257,4 +269,6 @@ export const SalesApi = {
     create: (payload: { invoice: UUID; amount: number | string; method: Payment['method']; reference?: string; received_at?: string; notes?: string; }) =>
       post<Payment>('/sales/payments/', payload),
   },
+
+  
 };

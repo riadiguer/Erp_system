@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   X,
   Save,
@@ -11,86 +11,114 @@ import {
   AlertCircle,
   CheckCircle,
 } from "lucide-react";
+import { type Product } from "@/lib/features/sales/api";
+
+interface ServiceFormProps {
+  service: Product | null;
+  onSave: (service: Partial<Product>) => void;
+  onClose: () => void;
+}
 
 const initialState = {
   name: "",
-  reference: "",
-  category: "",
-  stock: 0,
-  minStock: 1,
-  unit: "",
-  price: 0,
+  sku: "",
+  description: "",
+  unit: "forfait",
+  stock_qty: "0",
+  unit_price: "0",
+  tax_rate: "19",
+  track_stock: false, // Services typically don't track stock
+  is_active: true,
 };
 
-export default function ServiceForm({ service, onSave, onClose }) {
-  const [form, setForm] = useState(service || initialState);
-  const [errors, setErrors] = useState({});
-  const [touched, setTouched] = useState({});
+export default function ServiceForm({ service, onSave, onClose }: ServiceFormProps) {
+  const [form, setForm] = useState(initialState);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
 
-  const categories = ["Création", "Pose/Montage", "Maintenance", "Consulting", "Formation"];
-  const units = ["forfait", "prestation", "heure", "jour", "projet"];
+  const units = ["forfait", "prestation", "heure", "jour", "projet", "consultation"];
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setForm((prev) => ({
-      ...prev,
-      [name]:
-        name === "stock" || name === "minStock" || name === "price"
-          ? Number(value)
-          : value,
-    }));
+  useEffect(() => {
+    if (service) {
+      setForm({
+        name: service.name || "",
+        sku: service.sku || "",
+        description: service.description || "",
+        unit: service.unit || "forfait",
+        stock_qty: service.stock_qty || "0",
+        unit_price: service.unit_price || "0",
+        tax_rate: service.tax_rate || "19",
+        track_stock: service.track_stock ?? false,
+        is_active: service.is_active ?? true,
+      });
+    }
+  }, [service]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const { name, value, type } = e.target;
+    
+    if (type === "checkbox") {
+      const checked = (e.target as HTMLInputElement).checked;
+      setForm((prev) => ({ ...prev, [name]: checked }));
+    } else {
+      setForm((prev) => ({ ...prev, [name]: value }));
+    }
     
     if (errors[name]) {
       setErrors((prev) => ({ ...prev, [name]: "" }));
     }
   };
 
-  const handleBlur = (field) => {
+  const handleBlur = (field: string) => {
     setTouched((prev) => ({ ...prev, [field]: true }));
     validateField(field);
   };
 
-  const validateField = (field) => {
+  const validateField = (field: string) => {
     const newErrors = { ...errors };
 
     switch (field) {
       case "name":
-        if (!form.name.trim()) {
+        if (!form.name || !form.name.trim()) {
           newErrors.name = "Le nom est obligatoire";
-        } else if (form.name.length < 3) {
+        } else if (form.name.trim().length < 3) {
           newErrors.name = "Le nom doit contenir au moins 3 caractères";
         } else {
           delete newErrors.name;
         }
         break;
-      case "reference":
-        if (!form.reference.trim()) {
-          newErrors.reference = "La référence est obligatoire";
+      case "sku":
+        if (!form.sku || !form.sku.trim()) {
+          newErrors.sku = "La référence est obligatoire";
         } else {
-          delete newErrors.reference;
+          delete newErrors.sku;
         }
         break;
-      case "stock":
-        if (form.stock < 0) {
-          newErrors.stock = "La capacité ne peut pas être négative";
+      case "stock_qty":
+        if (form.track_stock) {
+          const qty = parseFloat(form.stock_qty);
+          if (isNaN(qty) || qty < 0) {
+            newErrors.stock_qty = "La capacité ne peut pas être négative";
+          } else {
+            delete newErrors.stock_qty;
+          }
         } else {
-          delete newErrors.stock;
+          delete newErrors.stock_qty;
         }
         break;
-      case "minStock":
-        if (form.minStock < 0) {
-          newErrors.minStock = "La capacité minimum ne peut pas être négative";
-        } else if (form.minStock === 0) {
-          newErrors.minStock = "La capacité minimum doit être supérieure à 0";
+      case "unit_price":
+        const price = parseFloat(form.unit_price);
+        if (isNaN(price) || price < 0) {
+          newErrors.unit_price = "Le prix ne peut pas être négatif";
         } else {
-          delete newErrors.minStock;
+          delete newErrors.unit_price;
         }
         break;
-      case "price":
-        if (form.price < 0) {
-          newErrors.price = "Le prix ne peut pas être négatif";
+      case "unit":
+        if (!form.unit || !form.unit.trim()) {
+          newErrors.unit = "L'unité est obligatoire";
         } else {
-          delete newErrors.price;
+          delete newErrors.unit;
         }
         break;
     }
@@ -100,7 +128,7 @@ export default function ServiceForm({ service, onSave, onClose }) {
   };
 
   const validateForm = () => {
-    const fields = ["name", "reference", "stock", "minStock", "price"];
+    const fields = ["name", "sku", "unit", "stock_qty", "unit_price"];
     let isValid = true;
 
     fields.forEach((field) => {
@@ -112,10 +140,10 @@ export default function ServiceForm({ service, onSave, onClose }) {
     return isValid;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    const allTouched = {};
+    const allTouched: Record<string, boolean> = {};
     Object.keys(form).forEach((key) => {
       allTouched[key] = true;
     });
@@ -125,7 +153,20 @@ export default function ServiceForm({ service, onSave, onClose }) {
       return;
     }
 
-    onSave(form);
+    const payload: Partial<Product> = {
+      name: form.name.trim(),
+      sku: form.sku.trim(),
+      description: form.description?.trim() || "",
+      type: "SERVICE", // Always set type to SERVICE
+      unit: form.unit.trim(),
+      unit_price: form.unit_price,
+      stock_qty: form.stock_qty,
+      tax_rate: form.tax_rate,
+      track_stock: form.track_stock,
+      is_active: form.is_active,
+    };
+
+    onSave(payload);
   };
 
   const InputField = ({
@@ -136,10 +177,21 @@ export default function ServiceForm({ service, onSave, onClose }) {
     required = false,
     placeholder = "",
     min,
+    max,
     step,
+  }: {
+    label: string;
+    name: string;
+    type?: string;
+    icon?: React.ElementType;
+    required?: boolean;
+    placeholder?: string;
+    min?: number | string;
+    max?: number | string;
+    step?: string;
   }) => {
     const hasError = touched[name] && errors[name];
-    const isValid = touched[name] && !errors[name] && form[name];
+    const isValid = touched[name] && !errors[name] && form[name as keyof typeof form];
 
     return (
       <div>
@@ -156,10 +208,11 @@ export default function ServiceForm({ service, onSave, onClose }) {
           <input
             type={type}
             name={name}
-            value={form[name]}
+            value={form[name as keyof typeof form] as string}
             onChange={handleChange}
             onBlur={() => handleBlur(name)}
             min={min}
+            max={max}
             step={step}
             placeholder={placeholder}
             className={`w-full ${Icon ? "pl-10" : "pl-4"} pr-10 py-3 border rounded-lg focus:ring-2 focus:outline-none transition-all ${
@@ -198,6 +251,12 @@ export default function ServiceForm({ service, onSave, onClose }) {
     options,
     icon: Icon,
     required = false,
+  }: {
+    label: string;
+    name: string;
+    options: string[];
+    icon?: React.ElementType;
+    required?: boolean;
   }) => {
     return (
       <div>
@@ -213,7 +272,7 @@ export default function ServiceForm({ service, onSave, onClose }) {
           )}
           <select
             name={name}
-            value={form[name]}
+            value={form[name as keyof typeof form] as string}
             onChange={handleChange}
             className={`w-full ${Icon ? "pl-10" : "pl-4"} pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-200 focus:border-indigo-500 focus:outline-none appearance-none bg-white cursor-pointer transition-all`}
             required={required}
@@ -245,13 +304,44 @@ export default function ServiceForm({ service, onSave, onClose }) {
     );
   };
 
-  const stockPercentage = form.minStock > 0 ? (form.stock / form.minStock) * 100 : 0;
+  const TextAreaField = ({
+    label,
+    name,
+    placeholder = "",
+  }: {
+    label: string;
+    name: string;
+    placeholder?: string;
+  }) => {
+    return (
+      <div>
+        <label className="block text-sm font-semibold text-gray-700 mb-2">
+          {label}
+        </label>
+        <textarea
+          name={name}
+          value={form[name as keyof typeof form] as string}
+          onChange={handleChange}
+          rows={3}
+          placeholder={placeholder}
+          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-200 focus:border-indigo-500 focus:outline-none transition-all"
+        />
+      </div>
+    );
+  };
+
+  const minCapacity = 5;
+  const stockQty = parseFloat(form.stock_qty || "0");
+  const stockPercentage = minCapacity > 0 ? (stockQty / minCapacity) * 100 : 0;
   const stockStatus =
     stockPercentage < 50
       ? { color: "red", text: "Critique" }
       : stockPercentage < 100
       ? { color: "orange", text: "Bas" }
       : { color: "green", text: "Normal" };
+
+  const unitPrice = parseFloat(form.unit_price || "0");
+  const totalValue = stockQty * unitPrice;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
@@ -305,25 +395,27 @@ export default function ServiceForm({ service, onSave, onClose }) {
                   placeholder="Ex: Conception graphique"
                 />
                 <InputField
-                  label="Référence"
-                  name="reference"
+                  label="Référence (SKU)"
+                  name="sku"
                   icon={Tag}
                   required
                   placeholder="Ex: SV-001"
                 />
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                <SelectField
-                  label="Catégorie"
-                  name="category"
-                  options={categories}
-                  icon={Box}
+              <div className="mt-4">
+                <TextAreaField
+                  label="Description"
+                  name="description"
+                  placeholder="Description détaillée du service..."
                 />
+              </div>
+              <div className="grid grid-cols-1 gap-4 mt-4">
                 <SelectField
-                  label="Unité de mesure"
+                  label="Unité de facturation"
                   name="unit"
                   options={units}
                   icon={Box}
+                  required
                 />
               </div>
             </div>
@@ -334,55 +426,67 @@ export default function ServiceForm({ service, onSave, onClose }) {
                 <TrendingUp className="w-5 h-5 mr-2 text-indigo-600" />
                 Capacité et disponibilité
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <InputField
-                  label="Capacité actuelle"
-                  name="stock"
-                  type="number"
-                  icon={Briefcase}
-                  required
-                  min={0}
-                  placeholder="0"
-                />
-                <InputField
-                  label="Capacité minimum"
-                  name="minStock"
-                  type="number"
-                  icon={AlertCircle}
-                  required
-                  min={1}
-                  placeholder="1"
-                />
+              
+              <div className="mb-4">
+                <label className="flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    name="track_stock"
+                    checked={form.track_stock}
+                    onChange={handleChange}
+                    className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                  />
+                  <span className="ml-2 text-sm font-medium text-gray-700">
+                    Suivre la capacité disponible
+                  </span>
+                </label>
               </div>
 
-              {/* Indicateur visuel */}
-              {form.stock > 0 && form.minStock > 0 && (
-                <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-gray-700">
-                      Niveau de capacité
-                    </span>
-                    <span
-                      className={`text-sm font-semibold px-2 py-1 rounded bg-${stockStatus.color}-100 text-${stockStatus.color}-700`}
-                    >
-                      {stockStatus.text}
-                    </span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
-                    <div
-                      className={`h-full bg-${stockStatus.color}-500 transition-all duration-500 rounded-full`}
-                      style={{
-                        width: `${Math.min(stockPercentage, 100)}%`,
-                      }}
+              {form.track_stock && (
+                <>
+                  <div className="grid grid-cols-1 gap-4">
+                    <InputField
+                      label="Capacité disponible"
+                      name="stock_qty"
+                      type="number"
+                      icon={Briefcase}
+                      required
+                      min={0}
+                      step="0.01"
+                      placeholder="0"
                     />
                   </div>
-                  <div className="flex justify-between mt-1 text-xs text-gray-500">
-                    <span>
-                      {form.stock} {form.unit || "unité(s)"}
-                    </span>
-                    <span>{Math.round(stockPercentage)}%</span>
-                  </div>
-                </div>
+
+                  {/* Indicateur visuel */}
+                  {stockQty > 0 && (
+                    <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-medium text-gray-700">
+                          Niveau de capacité
+                        </span>
+                        <span
+                          className={`text-sm font-semibold px-2 py-1 rounded bg-${stockStatus.color}-100 text-${stockStatus.color}-700`}
+                        >
+                          {stockStatus.text}
+                        </span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                        <div
+                          className={`h-full bg-${stockStatus.color}-500 transition-all duration-500 rounded-full`}
+                          style={{
+                            width: `${Math.min(stockPercentage, 100)}%`,
+                          }}
+                        />
+                      </div>
+                      <div className="flex justify-between mt-1 text-xs text-gray-500">
+                        <span>
+                          {stockQty} {form.unit || "unité(s)"}
+                        </span>
+                        <span>{Math.round(stockPercentage)}%</span>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </div>
 
@@ -395,26 +499,53 @@ export default function ServiceForm({ service, onSave, onClose }) {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <InputField
                   label="Prix unitaire (DA)"
-                  name="price"
+                  name="unit_price"
                   type="number"
                   icon={DollarSign}
                   min={0}
-                  step={0.01}
+                  step="0.01"
                   placeholder="0.00"
+                  required
                 />
-                {form.price > 0 && form.stock > 0 && (
-                  <div className="flex items-end">
-                    <div className="w-full p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
-                      <p className="text-sm text-gray-600 mb-1">
-                        Valeur totale
-                      </p>
-                      <p className="text-2xl font-bold text-indigo-600">
-                        {(form.price * form.stock).toLocaleString()} DA
-                      </p>
-                    </div>
-                  </div>
-                )}
+                <InputField
+                  label="Taux de TVA (%)"
+                  name="tax_rate"
+                  type="number"
+                  icon={DollarSign}
+                  min={0}
+                  max={100}
+                  step="0.01"
+                  placeholder="19"
+                />
               </div>
+              {unitPrice > 0 && stockQty > 0 && form.track_stock && (
+                <div className="mt-4">
+                  <div className="w-full p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
+                    <p className="text-sm text-gray-600 mb-1">
+                      Valeur totale de la capacité
+                    </p>
+                    <p className="text-2xl font-bold text-indigo-600">
+                      {totalValue.toLocaleString("fr-DZ")} DA
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Section: Statut */}
+            <div>
+              <label className="flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  name="is_active"
+                  checked={form.is_active}
+                  onChange={handleChange}
+                  className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                />
+                <span className="ml-2 text-sm font-medium text-gray-700">
+                  Service actif
+                </span>
+              </label>
             </div>
           </div>
 

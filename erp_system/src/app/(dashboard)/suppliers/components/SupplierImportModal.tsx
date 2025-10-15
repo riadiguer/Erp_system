@@ -6,6 +6,7 @@ import { useState } from "react";
 interface SupplierImportModalProps {
   open: boolean;
   onClose: () => void;
+  onSuccess?: (imported?: any) => void;
 }
 
 export default function SupplierImportModal({ open, onClose }: SupplierImportModalProps) {

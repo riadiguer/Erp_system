@@ -105,6 +105,24 @@ class ProductSerializer(serializers.ModelSerializer):
     class Meta:
         model = Product
         fields = "__all__"
+        read_only_fields = ("created_at", "updated_at")
+
+class ProductWriteSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Product
+        fields = (
+            "sku", "name", "description", "type",
+            "unit", "unit_price",
+            "track_stock", "stock_qty",
+            "tax_rate", "is_active",
+        )
+
+    def validate(self, attrs):
+        # Services can’t track stock
+        if attrs.get("type") == Product.ProductType.SERVICE and attrs.get("track_stock"):
+            raise serializers.ValidationError("Services cannot track stock.")
+        return attrs
+
 
 class OrderLineSerializer(serializers.ModelSerializer):
     product_detail = ProductSerializer(source="product", read_only=True)

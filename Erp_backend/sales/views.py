@@ -5,6 +5,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 
+
 from .models import DeliveryLine, Order, DeliveryNote, Invoice, Payment, Product, Customer ,SalesPoint ,Quote,OrderLine
 from .serializers import (
     # Orders
@@ -20,18 +21,75 @@ from .serializers import (
     SalesPointSerializer,
     # Quotes
     QuoteSerializer, QuoteWriteSerializer, QuoteLineSerializer, QuoteLineWriteSerializer,
+    # Products
+    ProductSerializer, ProductWriteSerializer
 )
-from .permissions import SalesPermission, InvoicesPermission
+from .permissions import SalesPermission, InvoicesPermission , ProductsPermission
 
 
 # --------- Read-only “reference” sets ----------
 class ProductViewSet(viewsets.ModelViewSet):
-    queryset = Product.objects.filter(is_active=True).order_by("sku")
-    serializer_class = ProductSerializer
-    permission_classes = [IsAuthenticated, SalesPermission]
-    filterset_fields = ("type",)
-    search_fields = ("sku", "name")
-    ordering_fields = ("sku", "name", "unit_price", "stock_qty")
+    queryset = Product.objects.all().order_by("-created_at")
+    permission_classes = [IsAuthenticated, ProductsPermission]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ("type", "track_stock", "is_active")
+    search_fields = ("sku", "name", "description")
+    ordering_fields = ("created_at", "updated_at", "sku", "name", "unit_price", "stock_qty", "tax_rate")
+    
+    def get_serializer_class(self):
+        if self.action in ("create", "update", "partial_update"):
+            return ProductWriteSerializer
+        return ProductSerializer
+
+    @decorators.action(detail=True, methods=["post"])
+    @transaction.atomic
+    def set_price(self, request, pk=None):
+        """
+        Body: {"unit_price": 123.45}
+        """
+        p = self.get_object()
+        up = request.data.get("unit_price")
+        if up is None:
+            return Response({"detail": "unit_price required"}, status=400)
+        p.unit_price = up
+        p.save(update_fields=["unit_price", "updated_at"])
+        return Response(ProductSerializer(p, context=self.get_serializer_context()).data)
+
+    @decorators.action(detail=True, methods=["post"])
+    @transaction.atomic
+    def adjust_stock(self, request, pk=None):
+        """
+        Body: {"delta": -3.5, "reason": "Stock correction"}
+        Only allowed when product.track_stock==True and type==GOOD
+        """
+        p = self.get_object()
+        if not p.track_stock or p.type != Product.ProductType.GOOD:
+            return Response({"detail": "Stock not tracked for this product."}, status=400)
+        try:
+            delta = request.data.get("delta")
+            delta = float(delta)
+        except Exception:
+            return Response({"detail": "delta must be a number."}, status=400)
+        new_qty = p.stock_qty + delta
+        if new_qty < 0:
+            return Response({"detail": "Resulting stock would be negative."}, status=400)
+        p.stock_qty = new_qty
+        p.save(update_fields=["stock_qty", "updated_at"])
+        return Response(ProductSerializer(p, context=self.get_serializer_context()).data)
+
+    @decorators.action(detail=True, methods=["post"])
+    def activate(self, request, pk=None):
+        p = self.get_object()
+        p.is_active = True
+        p.save(update_fields=["is_active", "updated_at"])
+        return Response({"ok": True})
+
+    @decorators.action(detail=True, methods=["post"])
+    def deactivate(self, request, pk=None):
+        p = self.get_object()
+        p.is_active = False
+        p.save(update_fields=["is_active", "updated_at"])
+        return Response({"ok": True})
 
 
 class CustomerViewSet(viewsets.ModelViewSet):

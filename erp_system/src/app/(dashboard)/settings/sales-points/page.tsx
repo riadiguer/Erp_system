@@ -7,14 +7,14 @@ import { PermissionGate } from '@/components/guards/PermissionGate';
 import type { SalesPoint } from '@/lib/features/sales/api';
 
 const kindLabels = {
-  SHOWROOM: 'Showroom / POS',
-  SOCIAL: 'Social Media',
-  WHATSAPP: 'WhatsApp / Phone',
-  WEBSITE: 'Website',
+  SHOWROOM: 'Showroom / Point de vente',
+  SOCIAL: 'Réseaux sociaux',
+  WHATSAPP: 'WhatsApp / Téléphone',
+  WEBSITE: 'Site Web',
   MARKET: 'Marketplace',
-  DEPOT: 'Depot',
-  FACTORY: 'Factory',
-  OTHER: 'Other'
+  DEPOT: 'Dépôt',
+  FACTORY: 'Usine',
+  OTHER: 'Autre'
 };
 
 const kindIcons = {
@@ -43,7 +43,7 @@ export default function SalesPointsPage() {
   const { salesPoints, refresh, loading, error } = useSalesPoints();
   const { orders } = useOrders();
   
-  // Form states
+  // États du formulaire
   const [name, setName] = useState('');
   const [kind, setKind] = useState<SalesPoint['kind']>('SHOWROOM');
   const [isLoading, setIsLoading] = useState(false);
@@ -53,14 +53,14 @@ export default function SalesPointsPage() {
   const [editKind, setEditKind] = useState<SalesPoint['kind']>('SHOWROOM');
   const [updatingId, setUpdatingId] = useState<number | string | null>(null);
   
-  // Filter and search states
+  // États de filtrage et recherche
   const [searchTerm, setSearchTerm] = useState('');
   const [filterKind, setFilterKind] = useState<SalesPoint['kind'] | 'ALL'>('ALL');
   const [filterActive, setFilterActive] = useState<'ALL' | 'ACTIVE' | 'INACTIVE'>('ALL');
   const [sortBy, setSortBy] = useState<'name' | 'kind' | 'created_at' | 'orders'>('name');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
-  // Calculate sales point statistics
+  // Calculer les statistiques des points de vente
   const salesPointStats = useMemo(() => {
     if (!orders || !salesPoints) return {};
     
@@ -81,7 +81,7 @@ export default function SalesPointsPage() {
     return stats;
   }, [orders, salesPoints]);
 
-  // Filter and sort sales points
+  // Filtrer et trier les points de vente
   const filteredAndSortedSalesPoints = useMemo(() => {
     let filtered = salesPoints.filter(sp => {
       const matchesSearch = sp.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -94,7 +94,7 @@ export default function SalesPointsPage() {
       return matchesSearch && matchesKind && matchesActive;
     });
 
-    // Sort the filtered results
+    // Trier les résultats filtrés
     filtered.sort((a, b) => {
       let comparison = 0;
       
@@ -123,7 +123,7 @@ export default function SalesPointsPage() {
     return filtered;
   }, [salesPoints, searchTerm, filterKind, filterActive, sortBy, sortOrder, salesPointStats]);
 
-  // Summary statistics
+  // Statistiques résumées
   const summary = useMemo(() => {
     const total = salesPoints.length;
     const active = salesPoints.filter(sp => sp.is_active).length;
@@ -146,7 +146,7 @@ export default function SalesPointsPage() {
       setKind('SHOWROOM'); 
       await refresh();
     } catch (error) {
-      console.error('Error adding sales point:', error);
+      console.error('Erreur lors de l\'ajout du point de vente:', error);
     } finally {
       setIsLoading(false);
     }
@@ -155,8 +155,8 @@ export default function SalesPointsPage() {
   async function deleteSalesPoint(id: string, name: string) {
     const orderCount = salesPointStats[id]?.orderCount || 0;
     const warningMessage = orderCount > 0 
-      ? `"${name}" has ${orderCount} associated orders. Are you sure you want to delete it? This action cannot be undone.`
-      : `Are you sure you want to delete "${name}"? This action cannot be undone.`;
+      ? `"${name}" a ${orderCount} commande(s) associée(s). Êtes-vous sûr de vouloir le supprimer ? Cette action est irréversible.`
+      : `Êtes-vous sûr de vouloir supprimer "${name}" ? Cette action est irréversible.`;
     
     if (!confirm(warningMessage)) {
       return;
@@ -167,7 +167,7 @@ export default function SalesPointsPage() {
       await SalesApi.salesPoints.delete(Number(id));
       await refresh();
     } catch (error) {
-      console.error('Error deleting sales point:', error);
+      console.error('Erreur lors de la suppression du point de vente:', error);
     } finally {
       setDeletingId(null);
     }
@@ -179,7 +179,7 @@ export default function SalesPointsPage() {
       await SalesApi.salesPoints.update(Number(id), { is_active: !currentStatus });
       await refresh();
     } catch (error) {
-      console.error('Error updating sales point status:', error);
+      console.error('Erreur lors de la mise à jour du statut du point de vente:', error);
     } finally {
       setUpdatingId(null);
     }
@@ -203,7 +203,7 @@ export default function SalesPointsPage() {
       setEditingId(null);
       await refresh();
     } catch (error) {
-      console.error('Error updating sales point:', error);
+      console.error('Erreur lors de la mise à jour du point de vente:', error);
     } finally {
       setUpdatingId(null);
     }
@@ -250,13 +250,13 @@ export default function SalesPointsPage() {
       <div className="max-w-6xl mx-auto p-6">
         <div className="bg-red-50 border border-red-200 rounded-lg p-4">
           <div className="text-red-800">
-            <h3 className="font-medium">Error loading sales points</h3>
-            <p className="mt-1 text-sm">{error.message || 'Something went wrong'}</p>
+            <h3 className="font-medium">Erreur lors du chargement des points de vente</h3>
+            <p className="mt-1 text-sm">{error.message || 'Une erreur s\'est produite'}</p>
             <button 
               onClick={() => refresh()} 
               className="mt-2 text-sm bg-red-100 hover:bg-red-200 px-3 py-1 rounded"
             >
-              Try again
+              Réessayer
             </button>
           </div>
         </div>
@@ -266,13 +266,13 @@ export default function SalesPointsPage() {
 
   return (
     <div className="max-w-6xl mx-auto p-6 space-y-8">
-      {/* Header with Summary Stats */}
+      {/* En-tête avec statistiques résumées */}
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Sales Points</h1>
-          <p className="text-gray-600 mt-1">Manage your sales channels and points of contact</p>
+          <h1 className="text-3xl font-bold text-gray-900">Points de Vente</h1>
+          <p className="text-gray-600 mt-1">Gérez vos canaux de vente et points de contact</p>
           
-          {/* Summary Cards */}
+          {/* Cartes résumées */}
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mt-6">
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
               <div className="text-blue-600 text-2xl font-bold">{summary.total}</div>
@@ -280,34 +280,34 @@ export default function SalesPointsPage() {
             </div>
             <div className="bg-green-50 border border-green-200 rounded-lg p-4">
               <div className="text-green-600 text-2xl font-bold">{summary.active}</div>
-              <div className="text-green-800 text-sm font-medium">Active</div>
+              <div className="text-green-800 text-sm font-medium">Actifs</div>
             </div>
             <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
               <div className="text-gray-600 text-2xl font-bold">{summary.inactive}</div>
-              <div className="text-gray-800 text-sm font-medium">Inactive</div>
+              <div className="text-gray-800 text-sm font-medium">Inactifs</div>
             </div>
             <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
               <div className="text-purple-600 text-2xl font-bold">{summary.totalOrders}</div>
-              <div className="text-purple-800 text-sm font-medium">Total Orders</div>
+              <div className="text-purple-800 text-sm font-medium">Total Commandes</div>
             </div>
             <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-              <div className="text-orange-600 text-2xl font-bold">${summary.totalRevenue}</div>
-              <div className="text-orange-800 text-sm font-medium">Total Revenue</div>
+              <div className="text-orange-600 text-2xl font-bold">{summary.totalRevenue} DT</div>
+              <div className="text-orange-800 text-sm font-medium">Revenu Total</div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Add Form */}
+      {/* Formulaire d'ajout */}
       <PermissionGate need="sales_manage">
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Add New Sales Point</h2>
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Ajouter un Nouveau Point de Vente</h2>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-2">Name</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Nom</label>
               <input 
                 className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:ring-opacity-20 transition-colors" 
-                placeholder="Enter sales point name" 
+                placeholder="Entrez le nom du point de vente" 
                 value={name} 
                 onChange={e => setName(e.target.value)}
                 onKeyPress={handleKeyPress}
@@ -331,83 +331,83 @@ export default function SalesPointsPage() {
                 onClick={add}
                 disabled={!name.trim() || isLoading}
               >
-                {isLoading ? 'Adding...' : 'Add Sales Point'}
+                {isLoading ? 'Ajout en cours...' : 'Ajouter Point de Vente'}
               </button>
             </div>
           </div>
         </div>
       </PermissionGate>
 
-      {/* Filters and Search */}
+      {/* Filtres et recherche */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Search</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Recherche</label>
             <input
               type="text"
-              placeholder="Search by name or slug..."
+              placeholder="Rechercher par nom ou slug..."
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Filter by Type</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Filtrer par Type</label>
             <select
               value={filterKind}
               onChange={e => setFilterKind(e.target.value as SalesPoint['kind'] | 'ALL')}
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
             >
-              <option value="ALL">All Types</option>
+              <option value="ALL">Tous les Types</option>
               {Object.entries(kindLabels).map(([value, label]) => (
                 <option key={value} value={value}>{label}</option>
               ))}
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Filter by Status</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Filtrer par Statut</label>
             <select
               value={filterActive}
               onChange={e => setFilterActive(e.target.value as 'ALL' | 'ACTIVE' | 'INACTIVE')}
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
             >
-              <option value="ALL">All Status</option>
-              <option value="ACTIVE">Active Only</option>
-              <option value="INACTIVE">Inactive Only</option>
+              <option value="ALL">Tous les Statuts</option>
+              <option value="ACTIVE">Actifs Seulement</option>
+              <option value="INACTIVE">Inactifs Seulement</option>
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Sort by</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Trier par</label>
             <select
               value={sortBy}
               onChange={e => setSortBy(e.target.value as 'name' | 'kind' | 'created_at' | 'orders')}
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
             >
-              <option value="name">Name</option>
+              <option value="name">Nom</option>
               <option value="kind">Type</option>
-              <option value="created_at">Created Date</option>
-              <option value="orders">Order Count</option>
+              <option value="created_at">Date de Création</option>
+              <option value="orders">Nombre de Commandes</option>
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Order</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Ordre</label>
             <select
               value={sortOrder}
               onChange={e => setSortOrder(e.target.value as 'asc' | 'desc')}
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
             >
-              <option value="asc">Ascending</option>
-              <option value="desc">Descending</option>
+              <option value="asc">Croissant</option>
+              <option value="desc">Décroissant</option>
             </select>
           </div>
         </div>
       </div>
 
-      {/* Sales Points Grid */}
+      {/* Grille des points de vente */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold text-gray-900">
-            Sales Points ({filteredAndSortedSalesPoints.length})
+            Points de Vente ({filteredAndSortedSalesPoints.length})
           </h2>
           {searchTerm || filterKind !== 'ALL' || filterActive !== 'ALL' ? (
             <button
@@ -418,7 +418,7 @@ export default function SalesPointsPage() {
               }}
               className="text-sm text-blue-600 hover:text-blue-800"
             >
-              Clear filters
+              Effacer les filtres
             </button>
           ) : null}
         </div>
@@ -427,12 +427,12 @@ export default function SalesPointsPage() {
           <div className="bg-gray-50 rounded-xl border-2 border-dashed border-gray-300 p-12 text-center">
             <div className="text-gray-400 text-4xl mb-4">🪟</div>
             <h3 className="text-lg font-medium text-gray-900 mb-2">
-              {salesPoints.length === 0 ? 'No sales points yet' : 'No matching sales points'}
+              {salesPoints.length === 0 ? 'Aucun point de vente pour le moment' : 'Aucun point de vente correspondant'}
             </h3>
             <p className="text-gray-600">
               {salesPoints.length === 0 
-                ? 'Add your first sales point to get started'
-                : 'Try adjusting your search or filter criteria'
+                ? 'Ajoutez votre premier point de vente pour commencer'
+                : 'Essayez d\'ajuster vos critères de recherche ou de filtrage'
               }
             </p>
           </div>
@@ -452,7 +452,7 @@ export default function SalesPointsPage() {
                       : 'border-gray-200 bg-gray-50/50 hover:border-gray-300'
                   }`}
                 >
-                  {/* Gradient Header */}
+                  {/* En-tête dégradé */}
                   <div className={`h-2 w-full ${
                     sp.is_active 
                       ? 'bg-gradient-to-r from-blue-500 via-purple-500 to-green-500' 
@@ -460,10 +460,10 @@ export default function SalesPointsPage() {
                   }`}></div>
                   
                   <div className="p-6">
-                    {/* Header Section */}
+                    {/* Section en-tête */}
                     <div className="flex items-start justify-between mb-6">
                       <div className="flex items-start space-x-4 flex-1">
-                        {/* Icon with background */}
+                        {/* Icône avec fond */}
                         <div className={`flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center text-2xl shadow-sm border ${kindColors[sp.kind]}`}>
                           {kindIcons[sp.kind]}
                         </div>
@@ -477,7 +477,7 @@ export default function SalesPointsPage() {
                                 onChange={e => setEditName(e.target.value)}
                                 onKeyPress={e => handleEditKeyPress(e, String(sp.id))}
                                 className="w-full px-3 py-2 text-lg font-semibold border border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:ring-opacity-20 transition-colors"
-                                placeholder="Sales point name"
+                                placeholder="Nom du point de vente"
                               />
                               <select
                                 value={editKind}
@@ -503,7 +503,7 @@ export default function SalesPointsPage() {
                         </div>
                       </div>
                       
-                      {/* Status Badge */}
+                      {/* Badge de statut */}
                       <div className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-bold shadow-sm border ${
                         sp.is_active 
                           ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
@@ -512,18 +512,18 @@ export default function SalesPointsPage() {
                         <span className={`inline-block w-2 h-2 rounded-full mr-2 ${
                           sp.is_active ? 'bg-emerald-500' : 'bg-gray-400'
                         }`}></span>
-                        {sp.is_active ? 'Active' : 'Inactive'}
+                        {sp.is_active ? 'Actif' : 'Inactif'}
                       </div>
                     </div>
 
-                    {/* Stats Section */}
+                    {/* Section statistiques */}
                     <div className="grid grid-cols-2 gap-4 mb-6">
                       <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-4 border border-blue-200">
                         <div className="flex items-center justify-between mb-2">
                           <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
                           </svg>
-                          <span className="text-xs font-medium text-blue-700">Orders</span>
+                          <span className="text-xs font-medium text-blue-700">Commandes</span>
                         </div>
                         <div className="text-2xl font-bold text-blue-900">{stats.orderCount}</div>
                       </div>
@@ -533,13 +533,13 @@ export default function SalesPointsPage() {
                           <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
                           </svg>
-                          <span className="text-xs font-medium text-emerald-700">Revenue</span>
+                          <span className="text-xs font-medium text-emerald-700">Revenu</span>
                         </div>
-                        <div className="text-2xl font-bold text-emerald-900">${stats.totalRevenue}</div>
+                        <div className="text-2xl font-bold text-emerald-900">{stats.totalRevenue} DT</div>
                       </div>
                     </div>
 
-                    {/* Metadata Section */}
+                    {/* Section métadonnées */}
                     <div className="space-y-3 mb-6">
                       <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border">
                         <span className="text-sm font-medium text-gray-600 flex items-center">
@@ -557,15 +557,15 @@ export default function SalesPointsPage() {
                         <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3a1 1 0 011-1h6a1 1 0 011 1v4m-7 0h8m-8 0a1 1 0 01-1 1v9a2 2 0 002 2h8a2 2 0 002-2V8a1 1 0 01-1-1" />
                         </svg>
-                        Created {new Date(sp.created_at).toLocaleDateString('en-US', { 
-                          month: 'short', 
-                          day: 'numeric', 
+                        Créé le {new Date(sp.created_at).toLocaleDateString('fr-FR', { 
+                          day: 'numeric',
+                          month: 'long', 
                           year: 'numeric' 
                         })}
                       </div>
                     </div>
 
-                    {/* Action Buttons */}
+                    {/* Boutons d'action */}
                     <PermissionGate need="sales_manage">
                       <div className="flex items-center justify-end space-x-2 pt-4 border-t border-gray-100">
                         {isEditing ? (
@@ -578,7 +578,7 @@ export default function SalesPointsPage() {
                               <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                               </svg>
-                              Save
+                              Enregistrer
                             </button>
                             <button
                               onClick={cancelEdit}
@@ -588,7 +588,7 @@ export default function SalesPointsPage() {
                               <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                               </svg>
-                              Cancel
+                              Annuler
                             </button>
                           </div>
                         ) : (
@@ -597,12 +597,12 @@ export default function SalesPointsPage() {
                               onClick={() => startEdit(sp)}
                               disabled={isUpdating}
                               className="flex items-center px-3 py-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors disabled:opacity-50 text-sm font-medium"
-                              title="Edit sales point"
+                              title="Modifier le point de vente"
                             >
                               <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                               </svg>
-                              Edit
+                              Modifier
                             </button>
                             
                             <button
@@ -613,7 +613,7 @@ export default function SalesPointsPage() {
                                   ? 'text-orange-600 hover:text-orange-700 hover:bg-orange-50' 
                                   : 'text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50'
                               }`}
-                              title={sp.is_active ? 'Deactivate' : 'Activate'}
+                              title={sp.is_active ? 'Désactiver' : 'Activer'}
                             >
                               {isUpdating ? (
                                 <div className="w-4 h-4 mr-1 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
@@ -622,14 +622,14 @@ export default function SalesPointsPage() {
                                   <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728L5.636 5.636" />
                                   </svg>
-                                  Deactivate
+                                  Désactiver
                                 </>
                               ) : (
                                 <>
                                   <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                                   </svg>
-                                  Activate
+                                  Activer
                                 </>
                               )}
                             </button>
@@ -638,7 +638,7 @@ export default function SalesPointsPage() {
                               onClick={() => deleteSalesPoint(String(sp.id), sp.name)}
                               disabled={deletingId === sp.id}
                               className="flex items-center px-3 py-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50 text-sm font-medium"
-                              title="Delete sales point"
+                              title="Supprimer le point de vente"
                             >
                               {deletingId === sp.id ? (
                                 <div className="w-4 h-4 mr-1 border-2 border-red-600 border-t-transparent rounded-full animate-spin"></div>
@@ -647,7 +647,7 @@ export default function SalesPointsPage() {
                                   <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                   </svg>
-                                  Delete
+                                  Supprimer
                                 </>
                               )}
                             </button>

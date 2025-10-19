@@ -19,11 +19,11 @@ import {
 } from 'lucide-react';
 
 const statusConfig = {
-  DRAFT: { icon: Clock, color: 'bg-yellow-50 text-yellow-700 border-yellow-200', label: 'Draft' },
-  ISSUED: { icon: CheckCircle, color: 'bg-green-50 text-green-700 border-green-200', label: 'Issued' },
-  PAID: { icon: CheckCircle, color: 'bg-blue-50 text-blue-700 border-blue-200', label: 'Paid' },
-  OVERDUE: { icon: AlertCircle, color: 'bg-red-50 text-red-700 border-red-200', label: 'Overdue' },
-  CANCELLED: { icon: AlertCircle, color: 'bg-gray-50 text-gray-700 border-gray-200', label: 'Cancelled' },
+  DRAFT: { icon: Clock, color: 'bg-yellow-50 text-yellow-700 border-yellow-200', label: 'Brouillon' },
+  ISSUED: { icon: CheckCircle, color: 'bg-green-50 text-green-700 border-green-200', label: 'Émise' },
+  PAID: { icon: CheckCircle, color: 'bg-blue-50 text-blue-700 border-blue-200', label: 'Payée' },
+  OVERDUE: { icon: AlertCircle, color: 'bg-red-50 text-red-700 border-red-200', label: 'En retard' },
+  CANCELLED: { icon: AlertCircle, color: 'bg-gray-50 text-gray-700 border-gray-200', label: 'Annulée' },
 };
 
 export default function InvoicesPage() {
@@ -60,7 +60,7 @@ export default function InvoicesPage() {
   }
 
   const formatCurrency = (amount: number, currency: string) => {
-    return new Intl.NumberFormat('en-US', {
+    return new Intl.NumberFormat('fr-FR', {
       style: 'currency',
       currency: currency || 'USD'
     }).format(amount);
@@ -79,8 +79,8 @@ export default function InvoicesPage() {
             <Receipt className="w-5 h-5 text-white" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-slate-800">Invoices</h1>
-            <p className="text-sm text-slate-600">Manage your billing and payments</p>
+            <h1 className="text-2xl font-bold text-slate-800">Factures</h1>
+            <p className="text-sm text-slate-600">Gérez votre facturation et vos paiements</p>
           </div>
         </div>
 
@@ -93,7 +93,7 @@ export default function InvoicesPage() {
                 value={ord} 
                 onChange={(e) => setOrd(e.target.value)}
               >
-                <option value="">Select order to invoice...</option>
+                <option value="">Sélectionnez une commande à facturer...</option>
                 {orders?.filter(o => o.status !== 'CANCELLED').map((o) => (
                   <option key={o.id} value={o.id}>
                     {o.code} — {o.customer_detail?.name}
@@ -111,7 +111,7 @@ export default function InvoicesPage() {
               ) : (
                 <Plus className="w-4 h-4" />
               )}
-              <span className="hidden sm:inline">Create</span>
+              <span className="hidden sm:inline">Créer</span>
             </button>
           </div>
         </PermissionGate>
@@ -122,8 +122,8 @@ export default function InvoicesPage() {
         <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700">
           <AlertCircle className="w-5 h-5 flex-shrink-0" />
           <div>
-            <p className="font-medium">Failed to load invoices</p>
-            <p className="text-sm opacity-90">Please try refreshing the page</p>
+            <p className="font-medium">Échec du chargement des factures</p>
+            <p className="text-sm opacity-90">Veuillez actualiser la page</p>
           </div>
         </div>
       )}
@@ -133,7 +133,7 @@ export default function InvoicesPage() {
         <div className="flex items-center justify-center py-12">
           <div className="flex items-center gap-3 text-slate-600">
             <Loader2 className="w-5 h-5 animate-spin" />
-            <span>Loading invoices...</span>
+            <span>Chargement des factures...</span>
           </div>
         </div>
       )}
@@ -146,10 +146,10 @@ export default function InvoicesPage() {
               <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Receipt className="w-8 h-8 text-slate-400" />
               </div>
-              <h3 className="text-lg font-medium text-slate-800 mb-2">No invoices yet</h3>
-              <p className="text-slate-600 mb-4">Create your first invoice from an existing order</p>
+              <h3 className="text-lg font-medium text-slate-800 mb-2">Aucune facture pour le moment</h3>
+              <p className="text-slate-600 mb-4">Créez votre première facture à partir d'une commande existante</p>
               <PermissionGate need="invoices_manage">
-                <p className="text-sm text-slate-500">Select an order above to get started</p>
+                <p className="text-sm text-slate-500">Sélectionnez une commande ci-dessus pour commencer</p>
               </PermissionGate>
             </div>
           ) : (
@@ -197,7 +197,7 @@ export default function InvoicesPage() {
                     <div className="flex items-center gap-2">
                       <AlertCircle className="w-4 h-4 text-slate-400" />
                       <div>
-                        <div className="text-xs text-slate-500">Balance Due</div>
+                        <div className="text-xs text-slate-500">Solde dû</div>
                         <div className={`font-semibold ${Number(inv.balance_due) > 0 ? 'text-orange-600' : 'text-green-600'}`}>
                           {formatCurrency(Number(inv.balance_due), inv.currency)}
                         </div>
@@ -209,7 +209,7 @@ export default function InvoicesPage() {
                   <div className="flex items-center justify-between pt-4 border-t border-slate-100">
                     <div className="flex items-center gap-2 text-xs text-slate-500">
                       <Calendar className="w-3 h-3" />
-                      Created {inv.created_at ? new Date(inv.created_at).toLocaleDateString() : 'Recently'}
+                      Créée le {inv.created_at ? new Date(inv.created_at).toLocaleDateString('fr-FR') : 'Récemment'}
                     </div>
                     
                     <div className="flex gap-2">
@@ -225,7 +225,7 @@ export default function InvoicesPage() {
                             ) : (
                               <Send className="w-4 h-4" />
                             )}
-                            Issue
+                            Émettre
                           </button>
                         )}
                       </PermissionGate>

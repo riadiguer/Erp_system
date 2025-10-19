@@ -105,7 +105,7 @@ export default function DeliveryNoteDetailPage() {
       await SalesApi.deliveryNotes.markDelivered(data.id);
       await mutate();
     } catch (e: any) {
-      setErrMsg(e?.detail || 'Failed to mark delivered.');
+      setErrMsg(e?.detail || 'Échec du marquage comme livré.');
     } finally {
       setBusy(null);
     }
@@ -122,7 +122,7 @@ export default function DeliveryNoteDetailPage() {
       }));
 
     if (lines.length === 0) {
-      setErrMsg('Please select at least one line with quantity > 0');
+      setErrMsg('Veuillez sélectionner au moins une ligne avec une quantité > 0');
       return;
     }
 
@@ -133,7 +133,7 @@ export default function DeliveryNoteDetailPage() {
       setQuantities({});
       await mutate();
     } catch (e: any) {
-      setErrMsg(e?.detail || 'Failed to add lines.');
+      setErrMsg(e?.detail || 'Échec de l\'ajout des lignes.');
     } finally {
       setBusy(null);
     }
@@ -144,7 +144,7 @@ export default function DeliveryNoteDetailPage() {
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-6">
         <div className="max-w-6xl mx-auto">
           <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-red-800">
-            Failed to load delivery note: {error.message || error}
+            Échec du chargement du bon de livraison : {error.message || error}
           </div>
         </div>
       </div>
@@ -157,7 +157,7 @@ export default function DeliveryNoteDetailPage() {
         <div className="max-w-6xl mx-auto">
           <div className="rounded-2xl border bg-white p-12 text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto" />
-            <div className="mt-3 text-gray-600">Loading…</div>
+            <div className="mt-3 text-gray-600">Chargement…</div>
           </div>
         </div>
       </div>
@@ -174,6 +174,13 @@ export default function DeliveryNoteDetailPage() {
     data.status === 'CANCELLED' ? 'bg-red-100 text-red-800 border-red-200' :
     'bg-gray-100 text-gray-800 border-gray-200';
 
+  const statusLabel = {
+    'DRAFT': 'BROUILLON',
+    'SENT': 'ENVOYÉ',
+    'DELIVERED': 'LIVRÉ',
+    'CANCELLED': 'ANNULÉ'
+  }[data.status] || data.status;
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-6">
       <div className="max-w-6xl mx-auto space-y-8">
@@ -185,7 +192,7 @@ export default function DeliveryNoteDetailPage() {
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
-            Back to Delivery Notes
+            Retour aux bons de livraison
           </Link>
         </div>
 
@@ -196,13 +203,13 @@ export default function DeliveryNoteDetailPage() {
               <div className="flex items-center gap-3 mb-2">
                 <h1 className="text-3xl font-bold text-gray-900">{data.code}</h1>
                 <span className={`px-3 py-1 rounded-full border text-xs font-semibold ${badge}`}>
-                  {data.status}
+                  {statusLabel}
                 </span>
               </div>
               
               <div className="space-y-1 text-gray-700">
                 <div className="flex items-center gap-2">
-                  <span className="font-medium">Order:</span>
+                  <span className="font-medium">Commande :</span>
                   <Link 
                     href={`/sales/orders/${data.order}`}
                     className="text-blue-600 hover:underline"
@@ -211,8 +218,8 @@ export default function DeliveryNoteDetailPage() {
                   </Link>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="font-medium">Customer:</span>
-                  <span>{data.order_detail?.customer_detail?.name || 'Unknown'}</span>
+                  <span className="font-medium">Client :</span>
+                  <span>{data.order_detail?.customer_detail?.name || 'Inconnu'}</span>
                 </div>
               </div>
 
@@ -221,14 +228,14 @@ export default function DeliveryNoteDetailPage() {
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
-                  Created: {new Date(data.created_at).toLocaleString()}
+                  Créé le : {new Date(data.created_at).toLocaleString('fr-FR')}
                 </div>
                 {data.delivered_at && (
                   <div className="flex items-center gap-1 text-green-600">
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
-                    Delivered: {new Date(data.delivered_at).toLocaleString()}
+                    Livré le : {new Date(data.delivered_at).toLocaleString('fr-FR')}
                   </div>
                 )}
               </div>
@@ -244,7 +251,7 @@ export default function DeliveryNoteDetailPage() {
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
-                  {busy === 'deliver' ? 'Marking…' : 'Mark as Delivered'}
+                  {busy === 'deliver' ? 'Marquage…' : 'Marquer comme livré'}
                 </button>
               )}
             </PermissionGate>
@@ -252,7 +259,7 @@ export default function DeliveryNoteDetailPage() {
 
           {errMsg && (
             <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-red-800">
-              <strong>Error:</strong> {errMsg}
+              <strong>Erreur :</strong> {errMsg}
             </div>
           )}
         </div>
@@ -261,7 +268,7 @@ export default function DeliveryNoteDetailPage() {
         <section className="rounded-2xl border bg-white overflow-hidden shadow-sm">
           <div className="border-b bg-gray-50 px-6 py-4">
             <h2 className="text-lg font-semibold text-gray-900">
-              Items in this Delivery ({data.lines.length})
+              Articles dans cette livraison ({data.lines.length})
             </h2>
           </div>
           
@@ -270,19 +277,19 @@ export default function DeliveryNoteDetailPage() {
               <svg className="w-16 h-16 mx-auto mb-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
               </svg>
-              <p className="font-medium">No items in this delivery note yet</p>
-              {canEdit && <p className="text-sm mt-1">Add items from the order below</p>}
+              <p className="font-medium">Aucun article dans ce bon de livraison pour le moment</p>
+              {canEdit && <p className="text-sm mt-1">Ajoutez des articles depuis la commande ci-dessous</p>}
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="min-w-full text-sm">
                 <thead className="bg-gray-50 border-b">
                   <tr>
-                    <th className="px-6 py-3 text-left font-semibold text-gray-700">Product</th>
+                    <th className="px-6 py-3 text-left font-semibold text-gray-700">Produit</th>
                     <th className="px-6 py-3 text-left font-semibold text-gray-700">Description</th>
-                    <th className="px-6 py-3 text-right font-semibold text-gray-700">Qty (this note)</th>
-                    <th className="px-6 py-3 text-right font-semibold text-gray-700">Ordered</th>
-                    <th className="px-6 py-3 text-right font-semibold text-gray-700">Total Delivered</th>
+                    <th className="px-6 py-3 text-right font-semibold text-gray-700">Qté (ce bon)</th>
+                    <th className="px-6 py-3 text-right font-semibold text-gray-700">Commandé</th>
+                    <th className="px-6 py-3 text-right font-semibold text-gray-700">Total livré</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
@@ -292,10 +299,10 @@ export default function DeliveryNoteDetailPage() {
                       <tr key={dl.id} className="hover:bg-gray-50">
                         <td className="px-6 py-4">
                           <div className="font-medium text-gray-900">
-                            {ol?.product_detail?.sku || 'Unknown'}
+                            {ol?.product_detail?.sku || 'Inconnu'}
                           </div>
                           <div className="text-xs text-gray-500">
-                            {ol?.product_detail?.name || 'Unknown Product'}
+                            {ol?.product_detail?.name || 'Produit inconnu'}
                           </div>
                         </td>
                         <td className="px-6 py-4 text-gray-600">
@@ -324,10 +331,10 @@ export default function DeliveryNoteDetailPage() {
           <section className="rounded-2xl border bg-white shadow-sm overflow-hidden">
             <div className="border-b bg-gray-50 px-6 py-4">
               <h2 className="text-lg font-semibold text-gray-900">
-                Add More Items from Order
+                Ajouter plus d'articles depuis la commande
               </h2>
               <p className="text-sm text-gray-600 mt-1">
-                Select additional items to include in this delivery
+                Sélectionnez des articles supplémentaires à inclure dans cette livraison
               </p>
             </div>
 
@@ -361,10 +368,10 @@ export default function DeliveryNoteDetailPage() {
                           <div className="flex items-start justify-between gap-4">
                             <div>
                               <div className="font-semibold text-gray-900">
-                                {line.product_detail?.sku || 'Unknown SKU'}
+                                {line.product_detail?.sku || 'SKU inconnu'}
                               </div>
                               <div className="text-sm text-gray-600 mt-0.5">
-                                {line.product_detail?.name || 'Unknown Product'}
+                                {line.product_detail?.name || 'Produit inconnu'}
                               </div>
                               {line.description && (
                                 <div className="text-xs text-gray-500 mt-1">
@@ -374,7 +381,7 @@ export default function DeliveryNoteDetailPage() {
                             </div>
                             
                             <div className="text-right flex-shrink-0">
-                              <div className="text-sm text-amber-600">Available</div>
+                              <div className="text-sm text-amber-600">Disponible</div>
                               <div className="font-bold text-amber-700">{remaining}</div>
                             </div>
                           </div>
@@ -382,7 +389,7 @@ export default function DeliveryNoteDetailPage() {
                           {isSelected && (
                             <div className="mt-3 flex items-center gap-3">
                               <label className="text-sm font-medium text-gray-700 min-w-[120px]">
-                                Quantity to deliver:
+                                Quantité à livrer :
                               </label>
                               <input
                                 type="number"
@@ -394,7 +401,7 @@ export default function DeliveryNoteDetailPage() {
                                 className="w-32 rounded-lg border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                               />
                               <span className="text-sm text-gray-500">
-                                (max: {remaining})
+                                (max : {remaining})
                               </span>
                             </div>
                           )}
@@ -413,7 +420,7 @@ export default function DeliveryNoteDetailPage() {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
                       <span className="font-semibold">
-                        {selectedLines.length} item{selectedLines.length !== 1 ? 's' : ''} selected
+                        {selectedLines.length} article{selectedLines.length !== 1 ? 's' : ''} sélectionné{selectedLines.length !== 1 ? 's' : ''}
                       </span>
                     </div>
                   </div>
@@ -423,7 +430,7 @@ export default function DeliveryNoteDetailPage() {
                     disabled={selectedLines.length === 0 || busy === 'add'}
                     onClick={addLines}
                   >
-                    {busy === 'add' ? 'Adding…' : `Add ${selectedLines.length} Item${selectedLines.length !== 1 ? 's' : ''} to Delivery`}
+                    {busy === 'add' ? 'Ajout…' : `Ajouter ${selectedLines.length} article${selectedLines.length !== 1 ? 's' : ''} à la livraison`}
                   </button>
                 </div>
               )}
@@ -436,8 +443,8 @@ export default function DeliveryNoteDetailPage() {
             <svg className="w-12 h-12 mx-auto mb-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            <p className="font-medium">All order items included</p>
-            <p className="text-sm mt-1">No more items available to add from this order</p>
+            <p className="font-medium">Tous les articles de la commande sont inclus</p>
+            <p className="text-sm mt-1">Aucun autre article disponible à ajouter depuis cette commande</p>
           </div>
         )}
       </div>

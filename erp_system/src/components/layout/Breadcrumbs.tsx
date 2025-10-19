@@ -75,7 +75,7 @@ export function Breadcrumbs() {
         <div className="mt-3 px-4">
           <div className="h-px bg-gradient-to-r from-slate-200 via-slate-100 to-transparent"></div>
           <div className="mt-3 text-xs text-slate-500">
-            Currently viewing: <span className="font-medium text-slate-700">{crumbs[crumbs.length - 1]?.label}</span>
+            En cours de visualisation: <span className="font-medium text-slate-700">{crumbs[crumbs.length - 1]?.label}</span>
           </div>
         </div>
       )}

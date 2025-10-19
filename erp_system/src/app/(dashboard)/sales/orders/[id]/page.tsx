@@ -40,6 +40,14 @@ const STATUS_CONFIGS: Record<string, StatusConfig> = {
   },
 };
 
+const STATUS_LABELS: Record<string, string> = {
+  DRAFT: 'BROUILLON',
+  CONFIRMED: 'CONFIRMÉE',
+  PART_DELIV: 'PARTIELLEMENT LIVRÉE',
+  DELIVERED: 'LIVRÉE',
+  CANCELLED: 'ANNULÉE',
+};
+
 function StatusBadge({ status }: { status?: string }) {
   const statusConfig: StatusConfig = STATUS_CONFIGS[status ?? ''] || { 
     bg: 'bg-gray-50 border-gray-200', 
@@ -47,10 +55,12 @@ function StatusBadge({ status }: { status?: string }) {
     dot: 'bg-gray-400'
   };
 
+  const statusLabel = STATUS_LABELS[status ?? ''] || status?.replace('_', ' ');
+
   return (
     <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full border text-xs font-medium ${statusConfig.bg} ${statusConfig.text}`}>
       <div className={`w-2 h-2 rounded-full ${statusConfig.dot}`}></div>
-      {status?.replace('_', ' ')}
+      {statusLabel}
     </div>
   );
 }
@@ -144,19 +154,19 @@ export default function OrderDetailPage() {
   if (error) return (
     <div className="flex items-center justify-center min-h-[200px]">
       <div className="text-center">
-        <div className="text-red-600 text-lg font-medium mb-2">Failed to load order</div>
+        <div className="text-red-600 text-lg font-medium mb-2">Échec du chargement de la commande</div>
         <button 
           onClick={() => refresh()} 
           className="text-blue-600 hover:text-blue-700 text-sm font-medium"
         >
-          Try again
+          Réessayer
         </button>
       </div>
     </div>
   );
   if (!order) return (
     <div className="flex items-center justify-center min-h-[200px]">
-      <div className="text-gray-600 text-lg">Order not found</div>
+      <div className="text-gray-600 text-lg">Commande non trouvée</div>
     </div>
   );
 
@@ -178,7 +188,7 @@ export default function OrderDetailPage() {
                     <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
                   </div>
                   <div>
-                    <div className="text-xs text-gray-500 uppercase tracking-wide font-medium">Customer</div>
+                    <div className="text-xs text-gray-500 uppercase tracking-wide font-medium">Client</div>
                     <div className="font-medium text-gray-900">{order.customer_detail?.name}</div>
                   </div>
                 </div>
@@ -189,7 +199,7 @@ export default function OrderDetailPage() {
                       <div className="w-2 h-2 bg-green-600 rounded-full"></div>
                     </div>
                     <div>
-                      <div className="text-xs text-gray-500 uppercase tracking-wide font-medium">Sales Point</div>
+                      <div className="text-xs text-gray-500 uppercase tracking-wide font-medium">Point de vente</div>
                       <div className="font-medium text-gray-900">
                         {order.sales_point_detail.name}
                         {order.sales_point_detail.kind !== 'OTHER' && (
@@ -205,9 +215,9 @@ export default function OrderDetailPage() {
                     <div className="w-2 h-2 bg-gray-600 rounded-full"></div>
                   </div>
                   <div>
-                    <div className="text-xs text-gray-500 uppercase tracking-wide font-medium">Created</div>
+                    <div className="text-xs text-gray-500 uppercase tracking-wide font-medium">Créée le</div>
                     <div className="font-medium text-gray-900">
-                      {new Date(order.created_at).toLocaleDateString('en-US', { 
+                      {new Date(order.created_at).toLocaleDateString('fr-FR', { 
                         year: 'numeric', 
                         month: 'long', 
                         day: 'numeric',
@@ -236,7 +246,7 @@ export default function OrderDetailPage() {
                     onClick={confirm}
                     variant="secondary"
                   >
-                    {busy ? 'Confirming...' : 'Confirm Order'}
+                    {busy ? 'Confirmation...' : 'Confirmer la commande'}
                   </ActionButton>
                 )}
               </PermissionGate>
@@ -248,7 +258,7 @@ export default function OrderDetailPage() {
                     onClick={createInvoiceFromOrder}
                     variant="primary"
                   >
-                    {busy ? 'Creating...' : 'Create Invoice'}
+                    {busy ? 'Création...' : 'Créer une facture'}
                   </ActionButton>
                 )}
               </PermissionGate>
@@ -259,25 +269,25 @@ export default function OrderDetailPage() {
 
       {/* Financial Summary */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <MetricCard label="Subtotal" value={order.subtotal} currency={order.currency} />
-        <MetricCard label="Tax Amount" value={order.tax_amount} currency={order.currency} />
-        <MetricCard label="Total Amount" value={order.total} currency={order.currency} />
+        <MetricCard label="Sous-total" value={order.subtotal} currency={order.currency} />
+        <MetricCard label="Montant TVA" value={order.tax_amount} currency={order.currency} />
+        <MetricCard label="Montant total" value={order.total} currency={order.currency} />
       </div>
 
       {/* Order Lines */}
-      <Card title="Order Lines">
+      <Card title="Lignes de commande">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="border-b border-gray-200">
-                <th className="text-left py-3 px-4 font-semibold text-gray-900">Product</th>
-                <th className="text-right py-3 px-4 font-semibold text-gray-900">Quantity</th>
-                <th className="text-right py-3 px-4 font-semibold text-gray-900">Unit Price</th>
-                <th className="text-right py-3 px-4 font-semibold text-gray-900">Tax %</th>
-                <th className="text-right py-3 px-4 font-semibold text-gray-900">Subtotal</th>
-                <th className="text-right py-3 px-4 font-semibold text-gray-900">Tax</th>
+                <th className="text-left py-3 px-4 font-semibold text-gray-900">Produit</th>
+                <th className="text-right py-3 px-4 font-semibold text-gray-900">Quantité</th>
+                <th className="text-right py-3 px-4 font-semibold text-gray-900">Prix unitaire</th>
+                <th className="text-right py-3 px-4 font-semibold text-gray-900">TVA %</th>
+                <th className="text-right py-3 px-4 font-semibold text-gray-900">Sous-total</th>
+                <th className="text-right py-3 px-4 font-semibold text-gray-900">TVA</th>
                 <th className="text-right py-3 px-4 font-semibold text-gray-900">Total</th>
-                <th className="text-right py-3 px-4 font-semibold text-gray-900">Delivered</th>
+                <th className="text-right py-3 px-4 font-semibold text-gray-900">Livré</th>
               </tr>
             </thead>
             <tbody>
@@ -293,7 +303,7 @@ export default function OrderDetailPage() {
                         )}
                         {/* Description */}
                         <div className={`text-sm ${ln.product_detail?.name ? 'text-gray-600' : 'font-medium text-gray-900'}`}>
-                        {ln.description || `Item ${ln.id}`}
+                        {ln.description || `Article ${ln.id}`}
                         </div>
                     </div>
                     </td>
@@ -324,13 +334,13 @@ export default function OrderDetailPage() {
       {/* Related Documents */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Delivery Notes */}
-        <Card title="Delivery Notes">
+        <Card title="Bons de livraison">
           {deliveryNotes.length === 0 ? (
             <div className="text-center py-8">
               <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
                 <div className="w-6 h-6 bg-gray-400 rounded"></div>
               </div>
-              <p className="text-gray-600">No delivery notes yet</p>
+              <p className="text-gray-600">Aucun bon de livraison pour le moment</p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -339,14 +349,14 @@ export default function OrderDetailPage() {
                   <div>
                     <div className="font-semibold text-gray-900">{dn.code}</div>
                     <div className="text-sm text-gray-600 mt-1">
-                      <span className="capitalize">{dn.status.toLowerCase().replace('_', ' ')}</span>
+                      <span className="capitalize">{STATUS_LABELS[dn.status] || dn.status.toLowerCase().replace('_', ' ')}</span>
                       {dn.delivered_at && (
-                        <span> • {new Date(dn.delivered_at).toLocaleDateString()}</span>
+                        <span> • {new Date(dn.delivered_at).toLocaleDateString('fr-FR')}</span>
                       )}
                     </div>
                   </div>
                   <button className="text-blue-600 hover:text-blue-700 text-sm font-medium">
-                    View Details
+                    Voir les détails
                   </button>
                 </div>
               ))}
@@ -355,13 +365,13 @@ export default function OrderDetailPage() {
         </Card>
 
         {/* Invoices */}
-        <Card title="Invoices">
+        <Card title="Factures">
           {invoices.length === 0 ? (
             <div className="text-center py-8">
               <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
                 <div className="w-6 h-6 bg-gray-400 rounded"></div>
               </div>
-              <p className="text-gray-600">No invoices for this order</p>
+              <p className="text-gray-600">Aucune facture pour cette commande</p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -379,19 +389,19 @@ export default function OrderDetailPage() {
                               await refreshInvoices(); 
                             }}
                           >
-                            Issue
+                            Émettre
                           </button>
                         )}
                       </PermissionGate>
                       <button className="text-blue-600 hover:text-blue-700 text-sm font-medium">
-                        View
+                        Voir
                       </button>
                     </div>
                   </div>
                   <div className="text-sm text-gray-600">
-                    <span className="capitalize">{inv.status.toLowerCase()}</span>
-                    <span> • Total: {inv.total} {inv.currency}</span>
-                    <span> • Balance: {inv.balance_due}</span>
+                    <span className="capitalize">{inv.status === 'DRAFT' ? 'Brouillon' : inv.status === 'ISSUED' ? 'Émise' : inv.status === 'PAID' ? 'Payée' : inv.status.toLowerCase()}</span>
+                    <span> • Total : {inv.total} {inv.currency}</span>
+                    <span> • Solde : {inv.balance_due}</span>
                   </div>
                 </div>
               ))}

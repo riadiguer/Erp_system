@@ -15,19 +15,19 @@ export type MenuItem = {
 // Sidebar menu structure
 export const MENU: MenuItem[] = [
   {
-    label: "Dashboard",
+    label: "Tableau de bord",
     href: "/dashboard",
     // no `need` → visible to any logged-in user
   },
   {
-    label: "Sales",
+    label: "Ventes",
     href: "/sales/orders",
     need: ["sales_view"],
     children: [
-      { label: "Orders", href: "/sales/orders", need: ["sales_view"] },
-      { label: "Invoices", href: "/sales/invoices", need: ["invoices_view"] },
-      { label: "Quotes", href: "/sales/quotes", need: ["sales_view"] },
-      { label: "Delivery Notes", href: "/sales/delivery-notes", need: ["sales_view"] },
+      { label: "Commandes", href: "/sales/orders", need: ["sales_view"] },
+      { label: "Factures", href: "/sales/invoices", need: ["invoices_view"] },
+      { label: "Devis", href: "/sales/quotes", need: ["sales_view"] },
+      { label: "Notes de livraison", href: "/sales/delivery-notes", need: ["sales_view"] },
     ],
   },
   {
@@ -36,7 +36,7 @@ export const MENU: MenuItem[] = [
     
   },
   {
-    label: "Suppliers",
+    label: "Fournisseurs",
     href: "/suppliers",
     
   },
@@ -45,22 +45,22 @@ export const MENU: MenuItem[] = [
     href: "/stock",
     need: ["stock_view"],
     children: [
-      { label: "Products", href: "/stock/products", need: ["stock_view"] },
-      { label: "Warehouses", href: "/stock/warehouses", need: ["stock_view"] },
+      { label: "Produits", href: "/stock/products", need: ["stock_view"] },
+      { label: "Entrepôts", href: "/stock/warehouses", need: ["stock_view"] },
     ],
   },
   {
-    label: "Purchasing",
+    label: "Achat",
     href: "/purchasing",
     need: ["purchasing_view"],
   },
   {
-    label: "Users & Roles",
+    label: "Utilisateurs et rôles",
     href: "/settings/users",
      need: ["users_manage", "sales_manage"], // admin-like permission
       children: [
-      { label: "Users & Roles", href: "/settings/users", need: ["users_manage"] },
-      { label: "Sales Points", href: "/settings/sales-points", need: ["sales_manage"] },
+      { label: "Utilisateurs et rôles", href: "/settings/users", need: ["users_manage"] },
+      { label: "Points de vente", href: "/settings/sales-points", need: ["sales_manage"] },
     ],
   },
 ];

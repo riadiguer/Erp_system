@@ -159,11 +159,11 @@ export default function QuoteDetailPage() {
       }
       await refresh();
     } catch (e: any) {
-      if (e?.status === 400) setErr(e?.detail || 'Invalid operation for this quote state.');
-      else if (e?.status === 401) setErr('Please sign in again.');
-      else if (e?.status === 403) setErr('You do not have permission for this action.');
-      else if (e?.status === 404) setErr('Quote not found.');
-      else setErr('Something went wrong. Try again.');
+      if (e?.status === 400) setErr(e?.detail || 'Opération invalide pour cet état de devis.');
+      else if (e?.status === 401) setErr('Veuillez vous reconnecter.');
+      else if (e?.status === 403) setErr('Vous n\'avez pas la permission pour cette action.');
+      else if (e?.status === 404) setErr('Devis introuvable.');
+      else setErr('Une erreur s\'est produite. Veuillez réessayer.');
     } finally {
       setBusy(null);
     }
@@ -177,7 +177,7 @@ export default function QuoteDetailPage() {
             <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
             <div className="absolute inset-0 w-16 h-16 border-4 border-transparent border-r-purple-400 rounded-full animate-spin animation-delay-150" />
           </div>
-          <div className="text-slate-600 font-medium">Loading quote details...</div>
+          <div className="text-slate-600 font-medium">Chargement des détails du devis...</div>
         </div>
       </div>
     );
@@ -188,8 +188,8 @@ export default function QuoteDetailPage() {
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50 p-6 flex items-center justify-center">
         <div className="text-center space-y-4">
           <div className="text-6xl">😞</div>
-          <div className="text-xl font-semibold text-slate-800">Failed to load quote</div>
-          <div className="text-slate-600">Please try again or contact support</div>
+          <div className="text-xl font-semibold text-slate-800">Échec du chargement du devis</div>
+          <div className="text-slate-600">Veuillez réessayer ou contacter le support</div>
         </div>
       </div>
     );
@@ -200,9 +200,9 @@ export default function QuoteDetailPage() {
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50 p-6 flex items-center justify-center">
         <div className="text-center space-y-4">
           <div className="text-6xl">🔍</div>
-          <div className="text-xl font-semibold text-slate-800">Quote not found</div>
+          <div className="text-xl font-semibold text-slate-800">Devis introuvable</div>
           <Link href="/sales/quotes" className="text-blue-600 hover:underline">
-            ← Back to Quotes
+            ← Retour aux Devis
           </Link>
         </div>
       </div>
@@ -229,7 +229,7 @@ export default function QuoteDetailPage() {
               className="group flex items-center gap-2 text-slate-600 hover:text-slate-800 transition-colors duration-200"
             >
               <span className="transform transition-transform duration-200 group-hover:-translate-x-1">←</span>
-              <span className="font-medium">Back to Quotes</span>
+              <span className="font-medium">Retour aux Devis</span>
             </Link>
           </div>
 
@@ -242,7 +242,7 @@ export default function QuoteDetailPage() {
                     {quote.code}
                   </h1>
                   <div className="text-xl text-slate-700 font-medium">
-                    {quote.customer_detail?.name || 'Anonymous Customer'}
+                    {quote.customer_detail?.name || 'Client Anonyme'}
                   </div>
                 </div>
 
@@ -257,18 +257,18 @@ export default function QuoteDetailPage() {
                   {quote.valid_until && (
                     <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border bg-orange-50 text-orange-600 text-sm font-medium">
                       <span>⏰</span>
-                      Valid until {new Date(quote.valid_until).toLocaleDateString()}
+                      Valide jusqu'au {new Date(quote.valid_until).toLocaleDateString('fr-FR')}
                     </span>
                   )}
                 </div>
 
                 <div className="text-sm text-slate-500 space-y-1">
-                  <div>📅 Created {new Date(quote.created_at).toLocaleString()}</div>
+                  <div>📅 Créé le {new Date(quote.created_at).toLocaleString('fr-FR')}</div>
                   {quote.sent_at && (
-                    <div>📤 Sent {new Date(quote.sent_at).toLocaleString()}</div>
+                    <div>📤 Envoyé le {new Date(quote.sent_at).toLocaleString('fr-FR')}</div>
                   )}
                   {quote.decided_at && (
-                    <div>✅ Decided {new Date(quote.decided_at).toLocaleString()}</div>
+                    <div>✅ Décidé le {new Date(quote.decided_at).toLocaleString('fr-FR')}</div>
                   )}
                 </div>
               </div>
@@ -284,7 +284,7 @@ export default function QuoteDetailPage() {
                       icon="📤"
                       loading={busy === 'send'}
                     >
-                      {busy === 'send' ? 'Sending...' : 'Send Quote'}
+                      {busy === 'send' ? 'Envoi en cours...' : 'Envoyer le Devis'}
                     </AnimatedButton>
                   )}
 
@@ -297,7 +297,7 @@ export default function QuoteDetailPage() {
                         icon="✅"
                         loading={busy === 'accept'}
                       >
-                        {busy === 'accept' ? 'Accepting...' : 'Accept'}
+                        {busy === 'accept' ? 'Acceptation...' : 'Accepter'}
                       </AnimatedButton>
                       <AnimatedButton
                         onClick={() => doAction('reject')}
@@ -306,7 +306,7 @@ export default function QuoteDetailPage() {
                         icon="❌"
                         loading={busy === 'reject'}
                       >
-                        {busy === 'reject' ? 'Rejecting...' : 'Reject'}
+                        {busy === 'reject' ? 'Rejet...' : 'Rejeter'}
                       </AnimatedButton>
                       <AnimatedButton
                         onClick={() => doAction('expire')}
@@ -315,7 +315,7 @@ export default function QuoteDetailPage() {
                         icon="⏰"
                         loading={busy === 'expire'}
                       >
-                        {busy === 'expire' ? 'Expiring...' : 'Mark Expired'}
+                        {busy === 'expire' ? 'Expiration...' : 'Marquer Expiré'}
                       </AnimatedButton>
                     </>
                   )}
@@ -328,7 +328,7 @@ export default function QuoteDetailPage() {
                       icon="🔄"
                       loading={busy === 'toOrder'}
                     >
-                      {busy === 'toOrder' ? 'Converting...' : 'Convert to Order'}
+                      {busy === 'toOrder' ? 'Conversion...' : 'Convertir en Commande'}
                     </AnimatedButton>
                   )}
                 </PermissionGate>
@@ -348,13 +348,13 @@ export default function QuoteDetailPage() {
           {/* Totals */}
           <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <MetricCard 
-              label="Subtotal" 
+              label="Sous-total" 
               value={quote.subtotal} 
               currency={quote.currency}
               trend="neutral"
             />
             <MetricCard 
-              label="Tax Amount" 
+              label="Montant TVA" 
               value={quote.tax_amount} 
               currency={quote.currency}
               trend="neutral"
@@ -372,20 +372,20 @@ export default function QuoteDetailPage() {
             <div className="border-b border-slate-200 p-6">
               <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
                 <span>📋</span>
-                Quote Lines
+                Lignes du Devis
               </h2>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-gradient-to-r from-slate-50 to-slate-100">
-                    <th className="px-6 py-4 text-left font-semibold text-slate-700">Product</th>
+                    <th className="px-6 py-4 text-left font-semibold text-slate-700">Produit</th>
                     <th className="px-6 py-4 text-left font-semibold text-slate-700">Description</th>
-                    <th className="px-6 py-4 text-right font-semibold text-slate-700">Qty</th>
-                    <th className="px-6 py-4 text-right font-semibold text-slate-700">Unit Price</th>
-                    <th className="px-6 py-4 text-right font-semibold text-slate-700">Tax %</th>
-                    <th className="px-6 py-4 text-right font-semibold text-slate-700">Subtotal</th>
-                    <th className="px-6 py-4 text-right font-semibold text-slate-700">Tax</th>
+                    <th className="px-6 py-4 text-right font-semibold text-slate-700">Qté</th>
+                    <th className="px-6 py-4 text-right font-semibold text-slate-700">Prix Unitaire</th>
+                    <th className="px-6 py-4 text-right font-semibold text-slate-700">TVA %</th>
+                    <th className="px-6 py-4 text-right font-semibold text-slate-700">Sous-total</th>
+                    <th className="px-6 py-4 text-right font-semibold text-slate-700">TVA</th>
                     <th className="px-6 py-4 text-right font-semibold text-slate-700">Total</th>
                   </tr>
                 </thead>

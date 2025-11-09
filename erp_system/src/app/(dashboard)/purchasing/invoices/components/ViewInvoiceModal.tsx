@@ -176,8 +176,7 @@ export default function ViewInvoiceModal({
               <div className="bg-white p-4 rounded-lg shadow-sm">
                 <div className="flex items-center space-x-3 mb-2">
                   <Calendar className="w-5 h-5 text-orange-600" />
-                  <span className="text-sm font-medium text-gray-600">Date d'échéance</span>
-                </div>
+                  <span className="text-sm font-medium text-gray-600">Date d&apos;échéance</span>                </div>
                 <p className={`text-lg font-semibold ${isOverdue() ? 'text-red-600' : 'text-gray-900'}`}>
                   {formatDateShort(facture.dateEcheance)}
                 </p>

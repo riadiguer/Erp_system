@@ -13,7 +13,8 @@ import {
   Calendar,
   MapPin,
   Award,
-  Settings
+  Settings,
+  type LucideIcon
 } from 'lucide-react';
 
 export default function ProfilePage() {
@@ -37,7 +38,7 @@ export default function ProfilePage() {
     value, 
     color 
   }: {
-    icon: any;
+    icon: LucideIcon;
     label: string;
     value: string;
     color: string;

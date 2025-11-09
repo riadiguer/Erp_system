@@ -115,7 +115,7 @@ export default function TopBar({
       {query && (
         <div className="mt-3 pt-3 border-t border-gray-200">
           <p className="text-sm text-gray-600">
-            Recherche active : <span className="font-medium text-gray-900">"{query}"</span>
+            Recherche active : <span className="font-medium text-gray-900">&ldquo;{query}&rdquo;</span>
           </p>
         </div>
       )}

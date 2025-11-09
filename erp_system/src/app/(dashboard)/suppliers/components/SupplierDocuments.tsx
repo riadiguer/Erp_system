@@ -1,6 +1,6 @@
 "use client";
 
-import { Paperclip, Eye, Download, Upload, FileText, File, Trash2, AlertCircle } from "lucide-react";
+import { Paperclip, Eye, Download, Upload, Trash2, AlertCircle } from "lucide-react";
 import { useState } from "react";
 import { Supplier } from "@/lib/features/warehouse/types";
 import { toast } from "sonner";
@@ -17,11 +17,11 @@ type SupplierDocument = {
   date: string;
   fileUrl: string;
   size: string;
-  icon: any;
+  icon: React.ComponentType<{ className?: string }>;
 };
 
 export default function SupplierDocuments({ supplier }: SupplierDocumentsProps) {
-  const [uploading, setUploading] = useState(false);
+  const [uploading] = useState(false);
 
   // Mock documents - Replace with real API call when document management is implemented
   // TODO: Create backend endpoint for supplier documents

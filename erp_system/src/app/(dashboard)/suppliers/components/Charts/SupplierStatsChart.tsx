@@ -4,7 +4,28 @@ import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
 import { useSuppliers } from "@/lib/features/warehouse/hooks";
 import { Loader2 } from "lucide-react";
 
-const CustomTooltip = ({ active, payload }: any) => {
+interface TooltipProps {
+  active?: boolean;
+  payload?: Array<{
+    name: string;
+    value: number;
+    payload: {
+      fill: string;
+      total: number;
+    };
+  }>;
+}
+
+interface LabelProps {
+  cx: number;
+  cy: number;
+  midAngle: number;
+  innerRadius: number;
+  outerRadius: number;
+  percent: number;
+}
+
+const CustomTooltip = ({ active, payload }: TooltipProps) => {
   if (active && payload && payload.length) {
     return (
       <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-xl">
@@ -27,7 +48,7 @@ const CustomTooltip = ({ active, payload }: any) => {
   return null;
 };
 
-const CustomLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }: any) => {
+const CustomLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }: LabelProps) => {
   const RADIAN = Math.PI / 180;
   const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
   const x = cx + radius * Math.cos(-midAngle * RADIAN);
@@ -180,7 +201,7 @@ export default function SupplierStatsChart() {
       {/* Summary Bar */}
       <div className="relative z-10 px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700">
         <div className="flex items-center justify-between text-white">
-          <span className="text-xs font-semibold">Taux d'activité</span>
+          <span className="text-xs font-semibold">Taux d&apos;activité</span>
           <span className="text-sm font-bold">
             {total > 0 ? ((data[0].value / total) * 100).toFixed(0) : 0}% actifs
           </span>

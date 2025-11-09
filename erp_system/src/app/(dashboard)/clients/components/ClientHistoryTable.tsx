@@ -12,7 +12,6 @@ import {
   Bell,
   FileText,
   Calendar,
-  Filter,
   Eye
 } from "lucide-react";
 
@@ -143,17 +142,17 @@ export default function ClientHistoryTable({
   }, [filtered, page, pageSize]);
 
   const handleExportCSV = (allFiltered = true) => {
-    const toExport = allFiltered ? filtered : current;
-    if (onExport) onExport(toExport);
+  const toExport = allFiltered ? filtered : current;
+  if (onExport) onExport(toExport);
 
-    const headers = ["id", "date", "kind", "reference", "amount", "status", "user", "note"];
-    const rows = toExport.map((r) =>
-      headers.map((h) => {
-        const val = (r as any)[h];
-        if (val === undefined || val === null) return "";
-        return String(val).replace(/"/g, '""');
-      })
-    );
+  const headers = ["id", "date", "kind", "reference", "amount", "status", "user", "note"] as const;
+  const rows = toExport.map((r) =>
+    headers.map((h) => {
+      const val = r[h];
+      if (val === undefined || val === null) return "";
+      return String(val).replace(/"/g, '""');
+    })
+  );
 
     const csvLines = [
       headers.join(","),
@@ -202,7 +201,7 @@ export default function ClientHistoryTable({
 
           <select
             value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value as any)}
+            onChange={(e) => setTypeFilter(e.target.value as "" | HistoryItem["kind"] | "all")}
             className="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-blue-500"
             aria-label="Filtrer par type"
           >
@@ -233,7 +232,7 @@ export default function ClientHistoryTable({
 
           <select
             value={sortDir}
-            onChange={(e) => setSortDir(e.target.value as any)}
+            onChange={(e) => setSortDir(e.target.value as "desc" | "asc")}
             className="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-blue-500"
             aria-label="Trier"
           >

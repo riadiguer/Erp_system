@@ -1,6 +1,7 @@
 "use client";
 import React, { useEffect } from "react";
 import { X, AlertTriangle, Trash2, Loader } from "lucide-react";
+import { useDeleteCustomer } from "@/lib/features/customer/hooks";
 
 export type DeleteItem = {
   id: string;
@@ -10,31 +11,61 @@ export type DeleteItem = {
 type Props = {
   open: boolean;
   items?: DeleteItem[];
-  loading?: boolean;
-  onConfirm: (ids: string[]) => void;
   onClose: () => void;
+  onSuccess?: () => void;
 };
 
 export default function ClientDeleteModal({ 
   open, 
   items = [], 
-  loading = false, 
-  onConfirm, 
-  onClose 
+  onClose,
+  onSuccess 
 }: Props) {
+  const deleteMutation = useDeleteCustomer({
+    onSuccess: () => {
+      onSuccess?.();
+      onClose();
+    },
+    onError: (error) => {
+      alert(`Erreur lors de la suppression: ${error.message}`);
+    },
+  });
+
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !loading) onClose();
+      if (e.key === "Escape" && !deleteMutation.isPending) onClose();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose, loading]);
+  }, [open, onClose, deleteMutation.isPending]);
 
   if (!open) return null;
 
   const ids = items.map((i) => i.id);
   const names = items.map((i) => i.name ?? i.id);
+  const loading = deleteMutation.isPending;
+
+  const handleConfirm = async () => {
+    if (ids.length === 0) return;
+
+    // For single deletion
+    if (ids.length === 1) {
+      deleteMutation.mutate(Number(ids[0]));
+    } else {
+      // For multiple deletions - delete one by one
+      // Note: You might want to implement a batch delete endpoint in the backend
+      try {
+        for (const id of ids) {
+          await deleteMutation.mutateAsync(Number(id));
+        }
+        onSuccess?.();
+        onClose();
+      } catch {
+        // Error already handled by onError callback
+      }
+    }
+  };
 
   const previewList = () => {
     if (names.length === 0) return null;
@@ -77,7 +108,7 @@ export default function ClientDeleteModal({
             <button
               onClick={() => !loading && onClose()}
               aria-label="Fermer"
-              className="absolute right-0 top-0 text-white/80 hover:text-white transition-colors"
+              className="absolute right-0 top-0 text-white/80 hover:text-white transition-colors disabled:opacity-50"
               disabled={loading}
             >
               <X className="w-6 h-6" />
@@ -131,8 +162,9 @@ export default function ClientDeleteModal({
             <div className="flex items-start space-x-3">
               <AlertTriangle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
               <div className="text-xs text-yellow-800 space-y-1">
-                <p>• Les données liées (commandes, factures) ne seront pas forcément supprimées automatiquement selon la logique backend.</p>
-                <p>• Pensez à vérifier avant d'exécuter l'opération.</p>
+                <p>• Les données liées (contacts) seront également supprimées.</p>
+                <p>• Les commandes et factures associées pourraient être affectées.</p>
+                <p>• Pensez à vérifier avant d&apos;exécuter l&apos;opération.</p>
               </div>
             </div>
           </div>
@@ -142,14 +174,14 @@ export default function ClientDeleteModal({
         <div className="p-6 border-t border-gray-200 bg-gray-50 flex items-center justify-end gap-3">
           <button
             onClick={() => !loading && onClose()}
-            className="px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-100 transition-colors font-medium"
+            className="px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-100 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
             disabled={loading}
           >
             Annuler
           </button>
 
           <button
-            onClick={() => !loading && onConfirm(ids)}
+            onClick={handleConfirm}
             className={`inline-flex items-center px-6 py-2 rounded-lg text-white font-medium transition-all ${
               loading 
                 ? "bg-red-400 cursor-not-allowed" 

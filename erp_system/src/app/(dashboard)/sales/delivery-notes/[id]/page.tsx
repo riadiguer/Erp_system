@@ -42,6 +42,11 @@ type DeliveryNote = {
   lines: DeliveryLine[];
 };
 
+interface ApiError {
+  detail?: string;
+  message?: string;
+}
+
 export default function DeliveryNoteDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { data, error, mutate } = useSWR<DeliveryNote>(
@@ -104,8 +109,9 @@ export default function DeliveryNoteDetailPage() {
     try {
       await SalesApi.deliveryNotes.markDelivered(data.id);
       await mutate();
-    } catch (e: any) {
-      setErrMsg(e?.detail || 'Failed to mark delivered.');
+    } catch (e) {
+      const error = e as ApiError;
+      setErrMsg(error?.detail || 'Failed to mark delivered.');
     } finally {
       setBusy(null);
     }
@@ -115,7 +121,7 @@ export default function DeliveryNoteDetailPage() {
     if (!data || Object.keys(quantities).length === 0) return;
     
     const lines = Object.entries(quantities)
-      .filter(([_, qty]) => qty > 0)
+      .filter(([, qty]) => qty > 0)
       .map(([lineId, qty]) => ({ 
         order_line: lineId, 
         quantity: qty 
@@ -132,8 +138,9 @@ export default function DeliveryNoteDetailPage() {
       await SalesApi.deliveryNotes.addLines(data.id, lines);
       setQuantities({});
       await mutate();
-    } catch (e: any) {
-      setErrMsg(e?.detail || 'Failed to add lines.');
+    } catch (e) {
+      const error = e as ApiError;
+      setErrMsg(error?.detail || 'Failed to add lines.');
     } finally {
       setBusy(null);
     }

@@ -12,6 +12,7 @@ import {
   Loader,
   FolderOpen
 } from "lucide-react";
+import Image from "next/image";
 
 export type DocumentItem = {
   id: string;
@@ -271,7 +272,14 @@ export default function ClientDocuments({
 
             <div className="p-4 overflow-auto flex-1">
               {preview.mime?.startsWith("image/") && preview.dataUrl ? (
-                <img src={preview.dataUrl} alt={preview.name} className="w-full h-auto rounded-lg" />
+                <Image 
+                  src={preview.dataUrl} 
+                  alt={preview.name} 
+                  width={800} 
+                  height={600}
+                  className="w-full h-auto rounded-lg"
+                  unoptimized
+                />
               ) : preview.mime === "application/pdf" && preview.dataUrl ? (
                 <iframe src={preview.dataUrl} title={preview.name} className="w-full h-[70vh] rounded-lg" />
               ) : (

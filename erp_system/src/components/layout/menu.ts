@@ -30,16 +30,9 @@ export const MENU: MenuItem[] = [
       { label: "Delivery Notes", href: "/sales/delivery-notes", need: ["sales_view"] },
     ],
   },
-  {
-    label: "Clients",
-    href: "/clients",
-    
-  },
-  {
-    label: "Suppliers",
-    href: "/suppliers",
-    
-  },
+
+
+
   {
     label: "Stock",
     href: "/stock",
@@ -53,14 +46,29 @@ export const MENU: MenuItem[] = [
     label: "Purchasing",
     href: "/purchasing",
     need: ["purchasing_view"],
+    children: [
+      { label: "Purchase Orders", href: "/purchasing/orders", need: ["purchasing_view"] },
+    ],
   },
   {
-    label: "Users & Roles",
+    label: "suppliers",
+    href: "/suppliers",
+    need: ["suppliers_view"],
+    children: [
+      { label: "Suppliers", href: "/suppliers", need: ["suppliers_view"] },
+      { label: "Supplier Contacts", href: "/suppliers/contacts", need: ["suppliers_view"] },
+    ],
+  },
+
+  {label: "Customers", href: "/clients", need: ["customers_view"]}, 
+
+  {
+    label: "Settings",
     href: "/settings/users",
      need: ["users_manage", "sales_manage"], // admin-like permission
       children: [
       { label: "Users & Roles", href: "/settings/users", need: ["users_manage"] },
-      { label: "Sales Points", href: "/settings/sales-points", need: ["sales_manage"] },
+      { label: "Sales Points", href: "/settings/sales-points", need: ["users_manage"] },
     ],
   },
 ];

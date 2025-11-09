@@ -83,7 +83,7 @@ export default function SalesPointsPage() {
 
   // Filter and sort sales points
   const filteredAndSortedSalesPoints = useMemo(() => {
-    let filtered = salesPoints.filter(sp => {
+    const filtered = salesPoints.filter(sp => {
       const matchesSearch = sp.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            sp.slug.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesKind = filterKind === 'ALL' || sp.kind === filterKind;

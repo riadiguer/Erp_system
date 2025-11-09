@@ -2,10 +2,38 @@
 import React, { useState, useEffect } from 'react'
 import { X, Plus, Check, Building, AlertTriangle, Package, RotateCcw, DollarSign, Edit } from 'lucide-react'
 
+// Types
+interface Produit {
+  id: string
+  nom: string
+  type: 'produit' | 'matiere'
+  quantite: number
+  quantiteRetournee: number
+  prixUnitaire: number
+}
+
+interface RetourFormData {
+  fournisseur: {
+    id: string
+    nom: string
+    email: string
+    telephone: string
+    adresse: string
+  }
+  motifRetour: string
+  descriptionMotif: string
+  produits: Produit[]
+  prixAchat: number
+  montantRetour: number
+  commentaires: string
+  gestionnaire: string
+  numeroCommande: string
+}
+
 interface EditReturnModalProps {
   isOpen: boolean
   onClose: () => void
-  onSave: (formData: any) => void
+  onSave: (formData: RetourFormData) => void
   retourFournisseur: {
     id: string
     numeroRetour: string
@@ -18,14 +46,7 @@ interface EditReturnModalProps {
       adresse?: string
     }
     statut: string
-    produits: Array<{
-      id: string
-      nom: string
-      type: 'produit' | 'matiere'
-      quantite: number
-      quantiteRetournee: number
-      prixUnitaire: number
-    }>
+    produits: Produit[]
     motifRetour: string
     descriptionMotif: string
     prixAchat: number
@@ -59,18 +80,11 @@ export default function EditReturnModal({
   produitsDispo,
   motifsDispo 
 }: EditReturnModalProps) {
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<RetourFormData>({
     fournisseur: { id: '', nom: '', email: '', telephone: '', adresse: '' },
     motifRetour: '',
     descriptionMotif: '',
-    produits: [] as Array<{
-      id: string
-      nom: string
-      type: 'produit' | 'matiere'
-      quantite: number
-      quantiteRetournee: number
-      prixUnitaire: number
-    }>,
+    produits: [],
     prixAchat: 0,
     montantRetour: 0,
     commentaires: '',
@@ -89,7 +103,13 @@ export default function EditReturnModal({
   useEffect(() => {
     if (retourFournisseur && isOpen) {
       setFormData({
-        fournisseur: retourFournisseur.fournisseur,
+        fournisseur: {
+          id: retourFournisseur.fournisseur.id,
+          nom: retourFournisseur.fournisseur.nom,
+          email: retourFournisseur.fournisseur.email,
+          telephone: retourFournisseur.fournisseur.telephone,
+          adresse: retourFournisseur.fournisseur.adresse || ''
+        },
         motifRetour: retourFournisseur.motifRetour,
         descriptionMotif: retourFournisseur.descriptionMotif,
         produits: retourFournisseur.produits,
@@ -132,7 +152,7 @@ export default function EditReturnModal({
     return !Object.values(newErrors).some(error => error !== '')
   }
 
-  const calculateMontants = (produits) => {
+  const calculateMontants = (produits: Produit[]) => {
     const prixAchat = produits.reduce((total, produit) => total + (produit.quantite * produit.prixUnitaire), 0)
     const montantRetour = produits.reduce((total, produit) => total + (produit.quantiteRetournee * produit.prixUnitaire), 0)
     return { prixAchat, montantRetour }
@@ -140,7 +160,7 @@ export default function EditReturnModal({
 
   const handleSave = () => {
     const { prixAchat, montantRetour } = calculateMontants(formData.produits)
-    const updatedFormData = {
+    const updatedFormData: RetourFormData = {
       ...formData,
       prixAchat,
       montantRetour
@@ -151,7 +171,7 @@ export default function EditReturnModal({
     }
   }
 
-  const handleFournisseurChange = (fournisseurId) => {
+  const handleFournisseurChange = (fournisseurId: string) => {
     const fournisseur = fournisseursDispo.find(f => f.id === fournisseurId)
     setFormData({
       ...formData,
@@ -162,7 +182,7 @@ export default function EditReturnModal({
     }
   }
 
-  const addProduitToForm = (produit) => {
+  const addProduitToForm = (produit: typeof produitsDispo[0]) => {
     const existing = formData.produits.find(p => p.id === produit.id)
     if (existing) {
       const updatedProduits = formData.produits.map(p => 
@@ -180,7 +200,7 @@ export default function EditReturnModal({
         montantRetour
       })
     } else {
-      const updatedProduits = [...formData.produits, { 
+      const updatedProduits: Produit[] = [...formData.produits, { 
         ...produit, 
         quantite: 1,
         quantiteRetournee: 1 
@@ -198,7 +218,7 @@ export default function EditReturnModal({
     }
   }
 
-  const updateProduitQuantity = (produitId, field, newQuantite) => {
+  const updateProduitQuantity = (produitId: string, field: 'quantite' | 'quantiteRetournee', newQuantite: number) => {
     if (newQuantite <= 0) {
       removeProduitFromForm(produitId)
     } else {
@@ -215,7 +235,7 @@ export default function EditReturnModal({
     }
   }
 
-  const updateProduitPrice = (produitId, newPrice) => {
+  const updateProduitPrice = (produitId: string, newPrice: number) => {
     const updatedProduits = formData.produits.map(p => 
       p.id === produitId ? { ...p, prixUnitaire: newPrice } : p
     )
@@ -228,7 +248,7 @@ export default function EditReturnModal({
     })
   }
 
-  const removeProduitFromForm = (produitId) => {
+  const removeProduitFromForm = (produitId: string) => {
     const updatedProduits = formData.produits.filter(p => p.id !== produitId)
     const { prixAchat, montantRetour } = calculateMontants(updatedProduits)
     setFormData({
@@ -547,7 +567,7 @@ export default function EditReturnModal({
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-3">
               <Package className="w-4 h-4 inline mr-2" />
-              Ajouter d'autres produits à retourner
+              Ajouter d&apos;autres produits à retourner
             </label>
             <div className="border border-gray-300 rounded-lg max-h-48 overflow-y-auto">
               {produitsDispo

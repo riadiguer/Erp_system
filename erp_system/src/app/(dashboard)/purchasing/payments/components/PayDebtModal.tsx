@@ -1,11 +1,17 @@
 'use client'
 import React, { useState } from 'react'
-import { X, CreditCard, Check, Building, DollarSign, AlertTriangle, Calendar } from 'lucide-react'
+import { X, CreditCard, Check, Building, DollarSign, AlertTriangle } from 'lucide-react'
 
 interface PayDebtModalProps {
   isOpen: boolean
   onClose: () => void
-  onPay: (id: string, paymentData: any) => void
+  onPay: (id: string, paymentData: {
+  montant: number
+  methodePaiement: string
+  datePaiement: string
+  reference: string
+  commentaires: string
+}) => void
   item: {
     id?: string
     numeroReference?: string
@@ -350,7 +356,7 @@ export default function PayDebtModal({
               placeholder="Références bancaires, conditions particulières, notes..."
             />
             <div className="mt-1 text-xs text-gray-500">
-              Ces informations seront ajoutées à l'historique du paiement
+              Ces informations seront ajoutées à l&apos;historique du paiement
             </div>
           </div>
         </div>

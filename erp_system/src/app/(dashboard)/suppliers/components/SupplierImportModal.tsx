@@ -6,7 +6,7 @@ import { useState } from "react";
 interface SupplierImportModalProps {
   open: boolean;
   onClose: () => void;
-  onSuccess?: (imported?: any) => void;
+onSuccess?: (imported?: { count: number; suppliers: Array<{ id: number; name: string }> }) => void;
 }
 
 export default function SupplierImportModal({ open, onClose }: SupplierImportModalProps) {

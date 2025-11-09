@@ -187,7 +187,7 @@ export default function ViewPaymentModal({
               </div>
               
               <div className="bg-white border border-gray-200 rounded-lg p-6">
-                <span className="text-sm font-medium text-gray-600 block mb-3">Date d'échéance</span>
+               <span className="text-sm font-medium text-gray-600 block mb-3">Date d&apos;échéance</span>
                 <div className="flex items-center space-x-3">
                   <Calendar className="w-5 h-5 text-gray-500" />
                   <div>
@@ -335,7 +335,7 @@ export default function ViewPaymentModal({
                 <div>
                   <h4 className="text-lg font-bold text-red-900">Paiement en retard</h4>
                   <p className="text-red-700">
-                    Ce paiement a dépassé sa date d'échéance du {formatDate(paiement.dateEcheance)}. 
+                   Ce paiement a dépassé sa date d&apos;échéance du {formatDate(paiement.dateEcheance)}.
                     Une relance fournisseur pourrait être nécessaire.
                   </p>
                 </div>

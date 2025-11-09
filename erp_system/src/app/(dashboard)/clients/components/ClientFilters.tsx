@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { Search, X, Filter, Calendar, SlidersHorizontal } from "lucide-react";
 
 export type ClientFilters = {
@@ -42,27 +42,27 @@ export default function ClientFilters({
     });
   }, [value]);
 
+  const cleanFilters = useCallback((f: ClientFilters): ClientFilters => {
+    const out: ClientFilters = {};
+    if (f.query && f.query.trim() !== "") out.query = f.query.trim();
+    if (typeof f.status === "string" && f.status !== "") out.status = f.status;
+    if (typeof f.type === "string" && f.type !== "") out.type = f.type;
+    if (f.dateFrom) out.dateFrom = f.dateFrom;
+    if (f.dateTo) out.dateTo = f.dateTo;
+    if (f.sortBy) out.sortBy = f.sortBy;
+    return out;
+  }, []);
+
   useEffect(() => {
     const t = setTimeout(() => {
       onChange(cleanFilters(local));
     }, 250);
     return () => clearTimeout(t);
-  }, [local.query]);
+  }, [local.query, onChange, cleanFilters, local]);
 
   useEffect(() => {
     onChange(cleanFilters(local));
-  }, [local.status, local.type, local.dateFrom, local.dateTo, local.sortBy]);
-
-  function cleanFilters(f: ClientFilters): ClientFilters {
-    const out: ClientFilters = {};
-    if (f.query && f.query.trim() !== "") out.query = f.query.trim();
-    if (f.status && f.status !== "") out.status = f.status;
-    if (f.type && f.type !== "") out.type = f.type;
-    if (f.dateFrom) out.dateFrom = f.dateFrom;
-    if (f.dateTo) out.dateTo = f.dateTo;
-    if (f.sortBy) out.sortBy = f.sortBy;
-    return out;
-  }
+  }, [local.status, local.type, local.dateFrom, local.dateTo, local.sortBy, onChange, cleanFilters, local]);
 
   const handleReset = () => {
     const cleared: ClientFilters = { 
@@ -135,7 +135,7 @@ export default function ClientFilters({
             <label className="block text-xs font-medium text-gray-700 mb-1.5">Statut</label>
             <select
               value={local.status ?? ""}
-              onChange={(e) => setLocal((s) => ({ ...s, status: e.target.value as any }))}
+              onChange={(e) => setLocal((s) => ({ ...s, status: e.target.value as "" | "Actif" | "Inactif" }))}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               aria-label="Filtrer par statut"
             >
@@ -149,7 +149,7 @@ export default function ClientFilters({
             <label className="block text-xs font-medium text-gray-700 mb-1.5">Type</label>
             <select
               value={local.type ?? ""}
-              onChange={(e) => setLocal((s) => ({ ...s, type: e.target.value as any }))}
+              onChange={(e) => setLocal((s) => ({ ...s, type: e.target.value as "" | "Particulier" | "Société" }))}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               aria-label="Filtrer par type"
             >

@@ -205,7 +205,7 @@ export default function WarehouseModal({
           <div className="bg-gray-50 rounded-xl p-4 mb-6 border border-gray-200">
             <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center">
               <BarChart3 className="w-4 h-4 mr-2 text-purple-600" />
-              Évolution de l'utilisation (12 derniers mois)
+              Évolution de l&apos;utilisation (12 derniers mois)
             </h3>
             <div className="flex items-end justify-between h-32 space-x-2">
               {usageData.map((value, index) => (

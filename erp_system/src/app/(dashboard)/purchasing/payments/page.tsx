@@ -11,11 +11,8 @@ import {
   ArrowLeft,
   AlertTriangle,
   Building,
-  Calendar,
-  DollarSign,
   Clock,
   CheckCircle,
-  XCircle,
   MoreHorizontal
 } from 'lucide-react'
 
@@ -26,15 +23,48 @@ import EditPaymentModal from './components/EditPaymentModal'
 import DeletePaymentModal from './components/DeletePaymentModal'
 import PayDebtModal from './components/PayDebtModal'
 
+// Types
+interface Fournisseur {
+  id: string
+  nom: string
+  email: string
+  telephone: string
+  adresse?: string
+  totalDettes?: number
+  derniereFacture?: string
+}
+
+interface Paiement {
+  id: string
+  numeroReference: string
+  fournisseur: Fournisseur
+  datePaiement: string | null
+  dateEcheance: string
+  montantDu: number
+  montantPaye: number
+  montantRestant: number
+  statut: string
+  methodePaiement: string
+  numeroFacture: string
+  commentaires: string
+  gestionnaire: string
+}
+
+interface PaymentData {
+  montant: number
+  methodePaiement: string
+  commentaires: string
+}
+
 export default function PaymentsPage() {
   const [showModal, setShowModal] = useState(false)
   const [modalType, setModalType] = useState('')
-  const [selectedItem, setSelectedItem] = useState(null)
+  const [selectedItem, setSelectedItem] = useState<Paiement | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
-  const [showMobileMenu, setShowMobileMenu] = useState({})
+  const [showMobileMenu, setShowMobileMenu] = useState<Record<string, boolean>>({})
   
   // Données d'exemple pour les paiements fournisseur
-  const [paiements, setPaiements] = useState([
+  const [paiements, setPaiements] = useState<Paiement[]>([
     {
       id: 'PAY001',
       numeroReference: 'PAY-2024-001',
@@ -117,7 +147,7 @@ export default function PaymentsPage() {
     }
   ])
 
-  const [fournisseurs] = useState([
+  const [fournisseurs] = useState<Fournisseur[]>([
     {
       id: 'F001',
       nom: 'TechSupply SARL',
@@ -147,7 +177,7 @@ export default function PaymentsPage() {
     }
   ])
 
-  const openModal = (type, item = null) => {
+  const openModal = (type: React.SetStateAction<string>, item: Paiement | null = null) => {
     setModalType(type)
     setSelectedItem(item)
     setShowModal(true)
@@ -160,30 +190,39 @@ export default function PaymentsPage() {
     setSelectedItem(null)
   }
 
-  const handleAddPaiement = (formData) => {
-    const newPaiement = {
+  const handleAddPaiement = (formData: Partial<Paiement> & { statut: string }) => {
+    const newPaiement: Paiement = {
       id: `PAY${String(paiements.length + 1).padStart(3, '0')}`,
       numeroReference: `PAY-2024-${String(paiements.length + 1).padStart(3, '0')}`,
-      ...formData,
-      datePaiement: formData.statut === 'Payé' ? new Date().toISOString().split('T')[0] : null
+      datePaiement: formData.statut === 'Payé' ? new Date().toISOString().split('T')[0] : null,
+      fournisseur: formData.fournisseur || { id: '', nom: '', email: '', telephone: '' },
+      dateEcheance: formData.dateEcheance || '',
+      montantDu: formData.montantDu || 0,
+      montantPaye: formData.montantPaye || 0,
+      montantRestant: formData.montantRestant || 0,
+      statut: formData.statut || 'En attente',
+      methodePaiement: formData.methodePaiement || '',
+      numeroFacture: formData.numeroFacture || '',
+      commentaires: formData.commentaires || '',
+      gestionnaire: formData.gestionnaire || ''
     }
     setPaiements([...paiements, newPaiement])
     closeModal()
   }
 
-  const handleEditPaiement = (formData) => {
+  const handleEditPaiement = (formData: Partial<Paiement>) => {
     setPaiements(paiements.map(p => 
-      p.id === selectedItem.id ? { ...p, ...formData } : p
+      p.id === selectedItem?.id ? { ...p, ...formData } : p
     ))
     closeModal()
   }
 
-  const handleDeletePaiement = (id) => {
+  const handleDeletePaiement = (id: string) => {
     setPaiements(paiements.filter(p => p.id !== id))
     closeModal()
   }
 
-  const handlePayDebt = (id, paymentData) => {
+  const handlePayDebt = (id: string, paymentData: PaymentData) => {
     setPaiements(paiements.map(p => 
       p.id === id ? { 
         ...p, 
@@ -205,7 +244,7 @@ export default function PaymentsPage() {
     paiement.numeroFacture.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
-  const getStatutColor = (statut) => {
+  const getStatutColor = (statut: string) => {
     switch (statut) {
       case 'Payé': return 'text-green-700 bg-green-100 border-green-200'
       case 'Partiel': return 'text-yellow-700 bg-yellow-100 border-yellow-200'
@@ -224,16 +263,16 @@ export default function PaymentsPage() {
     return paiements.reduce((total, p) => total + p.montantPaye, 0)
   }
 
-  const canPay = (statut) => {
+  const canPay = (statut: string) => {
     return statut === 'En attente' || statut === 'Partiel' || statut === 'En retard'
   }
 
-  const isOverdue = (dateEcheance, statut) => {
+  const isOverdue = (dateEcheance: string, statut: string) => {
     if (statut === 'Payé') return false
     return new Date(dateEcheance) < new Date()
   }
 
-  const toggleMobileMenu = (id) => {
+  const toggleMobileMenu = (id: string) => {
     setShowMobileMenu(prev => ({
       ...prev,
       [id]: !prev[id]
@@ -638,24 +677,24 @@ export default function PaymentsPage() {
                         <p className="text-xs text-gray-500">{fournisseur.id}</p>
                       </div>
                     </div>
-                    <div className={`text-right ${fournisseur.totalDettes > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                    <div className={`text-right ${fournisseur.totalDettes && fournisseur.totalDettes > 0 ? 'text-red-600' : 'text-green-600'}`}>
                       <div className="text-lg font-bold">
-                        {fournisseur.totalDettes.toLocaleString()} DT
+                        {(fournisseur.totalDettes || 0).toLocaleString()} DT
                       </div>
                       <div className="text-xs">
-                        {fournisseur.totalDettes > 0 ? 'À payer' : 'Soldé'}
+                        {fournisseur.totalDettes && fournisseur.totalDettes > 0 ? 'À payer' : 'Soldé'}
                       </div>
                     </div>
                   </div>
                   
                   <div className="text-xs text-gray-600 mb-3">
                     <div>Email: {fournisseur.email}</div>
-                    <div>Dernière facture: {new Date(fournisseur.derniereFacture).toLocaleDateString('fr-FR')}</div>
+                    <div>Dernière facture: {fournisseur.derniereFacture ? new Date(fournisseur.derniereFacture).toLocaleDateString('fr-FR') : 'N/A'}</div>
                   </div>
 
-                  {fournisseur.totalDettes > 0 && (
+                  {fournisseur.totalDettes && fournisseur.totalDettes > 0 && (
                     <button
-                      onClick={() => openModal('pay', { fournisseur, montantRestant: fournisseur.totalDettes })}
+                      onClick={() => openModal('pay', { fournisseur, montantRestant: fournisseur.totalDettes } as Paiement)}
                       className="w-full flex items-center justify-center px-3 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-xs"
                     >
                       <CreditCard className="w-3 h-3 mr-1" />

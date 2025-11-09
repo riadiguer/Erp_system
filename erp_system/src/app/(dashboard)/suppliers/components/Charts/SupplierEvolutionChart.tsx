@@ -12,12 +12,24 @@ import {
 import { Loader2, TrendingUp } from "lucide-react";
 import { useSupplierStatistics } from "@/lib/features/warehouse/hooks";
 
-const CustomTooltip = ({ active, payload, label }: any) => {
+type TooltipPayload = {
+  color: string;
+  name: string;
+  value: number;
+};
+
+type CustomTooltipProps = {
+  active?: boolean;
+  payload?: TooltipPayload[];
+  label?: string;
+};
+
+const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
   if (active && payload && payload.length) {
     return (
       <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-xl">
         <p className="text-sm font-semibold text-gray-900 mb-2">{label}</p>
-        {payload.map((entry: any, index: number) => (
+        {payload.map((entry, index: number) => (
           <div key={index} className="flex items-center justify-between space-x-4">
             <span className="text-xs font-medium" style={{ color: entry.color }}>
               {entry.name}

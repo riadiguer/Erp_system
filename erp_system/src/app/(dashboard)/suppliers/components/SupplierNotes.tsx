@@ -3,8 +3,12 @@
 import { useState } from "react";
 import { Plus, Trash2, Edit2, MessageSquare, User, Calendar } from "lucide-react";
 
+
+interface Supplier {
+  notes?: Note[];
+}
 interface SupplierNotesProps {
-  supplier?: any;
+  supplier?: Supplier;
 }
 
 interface Note {

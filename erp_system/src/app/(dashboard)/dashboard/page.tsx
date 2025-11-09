@@ -5,8 +5,7 @@ import {
   BarChart3, TrendingUp, Search, User, Bell, MessageCircle, 
   CreditCard, ShoppingCart, AlertTriangle, Users, Package, 
   PlusCircle, Receipt, Building2, FileText, Layers, Eye,
-  ArrowUpRight, ArrowDownRight, Calendar, Filter, Download,
-  Clock, CheckCircle, XCircle, DollarSign, Target, Zap
+  ArrowUpRight, ArrowDownRight, Clock, Target, Zap
 } from 'lucide-react'
 
 // Enhanced StatCard Component
@@ -91,7 +90,6 @@ function QuickAction({
 
 // Notification Component
 function NotificationCard({
-  type,
   message,
   time,
   priority = 'normal'
@@ -125,7 +123,7 @@ function NotificationCard({
 }
 
 // Chart Placeholder Component
-function ChartPlaceholder({ title, icon, type = 'line' }: { title: string; icon: React.ReactNode; type?: string }) {
+function ChartPlaceholder({ title, icon }: { title: string; icon: React.ReactNode }) {
   return (
     <div className="bg-white rounded-2xl border border-gray-100 p-6 hover:shadow-lg transition-shadow">
       <div className="flex items-center justify-between mb-6">
@@ -143,7 +141,7 @@ function ChartPlaceholder({ title, icon, type = 'line' }: { title: string; icon:
       <div className="h-64 flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl border-2 border-dashed border-gray-300">
         <div className="text-center">
           <BarChart3 className="w-12 h-12 text-gray-400 mx-auto mb-2" />
-          <p className="text-gray-500 font-medium">Graphique {type}</p>
+          <p className="text-gray-500 font-medium">Graphique</p>
           <p className="text-xs text-gray-400">Données à intégrer</p>
         </div>
       </div>
@@ -248,7 +246,7 @@ export default function DashboardPage() {
               </div>
               <div>
                 <h1 className="text-4xl font-bold text-gray-900">Tableau de bord</h1>
-                <p className="text-gray-600 text-lg">Vue d'ensemble de votre activité</p>
+                <p className="text-gray-600 text-lg">Vue d&apos;ensemble de votre activité</p>
               </div>
             </div>
             
@@ -412,12 +410,10 @@ export default function DashboardPage() {
           <ChartPlaceholder 
             title="Évolution des ventes" 
             icon={<TrendingUp className="w-5 h-5 text-blue-600" />}
-            type="line"
           />
           <ChartPlaceholder 
             title="Répartition par catégorie" 
             icon={<Target className="w-5 h-5 text-purple-600" />}
-            type="pie"
           />
         </div>
 

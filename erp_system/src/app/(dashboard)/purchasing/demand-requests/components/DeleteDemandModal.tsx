@@ -1,25 +1,14 @@
 'use client'
 import React from 'react'
-import { X, Trash2, AlertTriangle, User, Package, Calendar } from 'lucide-react'
+import { X, Trash2, AlertTriangle, User, Package, Calendar, Building2 } from 'lucide-react'
+import type { DemandRequest } from '@/lib/features/purchasing/api'
+import { priorityFromApi, statusFromApi } from '@/lib/features/purchasing/api'
 
 interface DeleteDemandModalProps {
   isOpen: boolean
   onClose: () => void
-  onDelete: (id: string) => void
-  demande: {
-    id: string
-    utilisateur: { id: string; nom: string }
-    dateCreation: string
-    priorite: string
-    statut: string
-    produits: Array<{
-      id: string
-      nom: string
-      type: 'produit' | 'matiere'
-      quantite: number
-    }>
-    commentaires: string
-  }
+  onDelete: (id: number) => void
+  demande: DemandRequest | null
 }
 
 export default function DeleteDemandModal({ 
@@ -35,7 +24,18 @@ export default function DeleteDemandModal({
   }
 
   const getTotalQuantity = () => {
-    return demande.produits.reduce((total, produit) => total + produit.quantite, 0)
+    return demande.lines.reduce((total, line) => total + parseFloat(line.quantity || '0'), 0)
+  }
+
+  const getTotalEstimatedAmount = () => {
+    if (demande.total_estimated_amount) {
+      return parseFloat(demande.total_estimated_amount).toFixed(2)
+    }
+    return demande.lines.reduce((total, line) => {
+      const qty = parseFloat(line.quantity || '0')
+      const price = parseFloat(line.estimated_price || '0')
+      return total + (qty * price)
+    }, 0).toFixed(2)
   }
 
   const formatDate = (dateString: string) => {
@@ -45,6 +45,9 @@ export default function DeleteDemandModal({
       day: 'numeric'
     })
   }
+
+  const prioriteFr = priorityFromApi(demande.priority)
+  const statutFr = statusFromApi(demande.status)
 
   return (
     <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
@@ -102,27 +105,46 @@ export default function DeleteDemandModal({
                       <Package className="w-4 h-4 mr-2" />
                       Numéro de demande
                     </div>
-                    <div className="text-lg font-bold text-gray-900">{demande.id}</div>
+                    <div className="text-lg font-bold text-gray-900">{demande.number}</div>
+                    <div className="text-xs text-gray-500 mt-1">ID: {demande.id}</div>
                   </div>
                   <div>
                     <div className="flex items-center text-sm text-gray-600 mb-1">
                       <Calendar className="w-4 h-4 mr-2" />
                       Date de création
                     </div>
-                    <div className="text-lg font-semibold text-gray-900">{formatDate(demande.dateCreation)}</div>
+                    <div className="text-lg font-semibold text-gray-900">{formatDate(demande.date)}</div>
                   </div>
                 </div>
               </div>
 
               {/* Informations utilisateur */}
               <div className="bg-white rounded-lg p-4 border border-red-200">
-                <div className="flex items-center text-sm text-gray-600 mb-2">
-                  <User className="w-4 h-4 mr-2" />
-                  Demandeur
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <div className="flex items-center text-sm text-gray-600 mb-2">
+                      <User className="w-4 h-4 mr-2" />
+                      Demandeur
+                    </div>
+                    <div className="text-base font-semibold text-gray-900">
+                      {demande.requester_name}
+                    </div>
+                    <div className="text-xs text-gray-500 mt-1">ID: {demande.requester_id}</div>
+                  </div>
+                  <div>
+                    <div className="flex items-center text-sm text-gray-600 mb-2">
+                      <Building2 className="w-4 h-4 mr-2" />
+                      Site
+                    </div>
+                    <div className="text-base font-semibold text-gray-900">{demande.site}</div>
+                  </div>
                 </div>
-                <div className="text-base font-semibold text-gray-900">
-                  {demande.utilisateur.nom} ({demande.utilisateur.id})
-                </div>
+              </div>
+
+              {/* Catégorie */}
+              <div className="bg-white rounded-lg p-4 border border-red-200">
+                <div className="text-sm text-gray-600 mb-1">Catégorie</div>
+                <div className="text-base font-semibold text-gray-900">{demande.category}</div>
               </div>
 
               {/* Statut et priorité */}
@@ -131,17 +153,23 @@ export default function DeleteDemandModal({
                   <div>
                     <div className="text-sm text-gray-600 mb-1">Priorité</div>
                     <span className={`inline-block px-3 py-1 text-sm font-semibold rounded-full ${
-                      demande.priorite === 'Haute' ? 'bg-red-100 text-red-800' :
-                      demande.priorite === 'Moyenne' ? 'bg-yellow-100 text-yellow-800' :
-                      'bg-green-100 text-green-800'
+                      demande.priority === 'high' ? 'bg-red-100 text-red-800 border border-red-200' :
+                      demande.priority === 'medium' ? 'bg-yellow-100 text-yellow-800 border border-yellow-200' :
+                      'bg-green-100 text-green-800 border border-green-200'
                     }`}>
-                      {demande.priorite}
+                      {prioriteFr}
                     </span>
                   </div>
                   <div>
                     <div className="text-sm text-gray-600 mb-1">Statut</div>
-                    <span className="inline-block px-3 py-1 text-sm font-semibold rounded-full bg-orange-100 text-orange-800">
-                      {demande.statut}
+                    <span className={`inline-block px-3 py-1 text-sm font-semibold rounded-full border ${
+                      demande.status === 'draft' ? 'bg-gray-100 text-gray-800 border-gray-200' :
+                      demande.status === 'submitted' ? 'bg-blue-100 text-blue-800 border-blue-200' :
+                      demande.status === 'approved' ? 'bg-green-100 text-green-800 border-green-200' :
+                      demande.status === 'rejected' ? 'bg-red-100 text-red-800 border-red-200' :
+                      'bg-orange-100 text-orange-800 border-orange-200'
+                    }`}>
+                      {statutFr}
                     </span>
                   </div>
                 </div>
@@ -153,27 +181,40 @@ export default function DeleteDemandModal({
           <div className="bg-yellow-50 border-2 border-yellow-200 rounded-xl p-6">
             <h4 className="text-lg font-bold text-yellow-900 mb-4 flex items-center">
               <AlertTriangle className="w-5 h-5 mr-2" />
-              Articles qui seront perdus ({demande.produits.length})
+              Articles qui seront perdus ({demande.lines.length})
             </h4>
             
-            <div className="bg-white rounded-lg p-4 border border-yellow-200 max-h-48 overflow-y-auto">
-              <div className="text-center mb-4 text-yellow-800">
-                <div className="text-2xl font-bold">{getTotalQuantity()}</div>
-                <div className="text-sm">articles au total</div>
+            <div className="bg-white rounded-lg p-4 border border-yellow-200">
+              <div className="grid grid-cols-2 gap-4 mb-4 text-center">
+                <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-200">
+                  <div className="text-2xl font-bold text-yellow-800">{getTotalQuantity()}</div>
+                  <div className="text-sm text-yellow-700">Quantité totale</div>
+                </div>
+                <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-200">
+                  <div className="text-2xl font-bold text-yellow-800">{getTotalEstimatedAmount()} DA</div>
+                  <div className="text-sm text-yellow-700">Montant estimé</div>
+                </div>
               </div>
               
-              <div className="space-y-2">
-                {demande.produits.map((produit, index) => (
-                  <div key={produit.id} className="flex items-center justify-between py-2 px-3 bg-yellow-50 rounded border border-yellow-200">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-6 h-6 bg-yellow-200 rounded-full flex items-center justify-center text-xs font-bold text-yellow-800">
+              <div className="space-y-2 max-h-48 overflow-y-auto">
+                {demande.lines.map((line, index) => (
+                  <div key={line.id || index} className="flex items-center justify-between py-3 px-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                    <div className="flex items-center space-x-3 flex-1">
+                      <div className="w-7 h-7 bg-yellow-200 rounded-full flex items-center justify-center text-xs font-bold text-yellow-800 flex-shrink-0">
                         {index + 1}
                       </div>
-                      <div className={`w-2 h-2 rounded-full ${produit.type === 'produit' ? 'bg-blue-500' : 'bg-green-500'}`} />
-                      <span className="text-sm font-medium text-gray-900">{produit.nom}</span>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-semibold text-gray-900 truncate">{line.material_name}</div>
+                        <div className="text-xs text-gray-600">ID: {line.material_id} • {line.uom}</div>
+                      </div>
                     </div>
-                    <div className="text-sm font-bold text-gray-900">
-                      Qté: {produit.quantite}
+                    <div className="text-right ml-3 flex-shrink-0">
+                      <div className="text-sm font-bold text-gray-900">Qté: {line.quantity}</div>
+                      {line.estimated_price && (
+                        <div className="text-xs text-gray-600">
+                          {parseFloat(line.estimated_price).toFixed(2)} DA
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -182,12 +223,23 @@ export default function DeleteDemandModal({
           </div>
 
           {/* Commentaires qui seront perdus */}
-          {demande.commentaires && (
+          {demande.comment && (
             <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
               <h5 className="font-semibold text-gray-900 mb-2">Commentaires qui seront perdus :</h5>
               <p className="text-sm text-gray-700 italic bg-white p-3 rounded border-l-4 border-gray-400">
-                "{demande.commentaires}"
+                &ldquo;{demande.comment}&rdquo;
               </p>
+            </div>
+          )}
+
+          {/* Date nécessaire */}
+          {demande.needed_date && (
+            <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+              <div className="flex items-center text-sm text-purple-700">
+                <Calendar className="w-4 h-4 mr-2" />
+                <span className="font-medium">Date nécessaire:</span>
+                <span className="ml-2 font-bold">{formatDate(demande.needed_date)}</span>
+              </div>
             </div>
           )}
 
@@ -198,9 +250,10 @@ export default function DeleteDemandModal({
               <div>
                 <h5 className="font-bold text-red-900 mb-2">Conséquences de la suppression :</h5>
                 <ul className="text-sm text-red-800 space-y-1 list-disc list-inside">
-                  <li>La demande {demande.id} sera définitivement supprimée</li>
-                  <li>{demande.produits.length} article{demande.produits.length > 1 ? 's' : ''} et {getTotalQuantity()} unité{getTotalQuantity() > 1 ? 's' : ''} seront perdu{getTotalQuantity() > 1 ? 'es' : 'e'}</li>
-                  <li>L'historique et les commentaires associés seront effacés</li>
+                  <li>La demande {demande.number} (ID: {demande.id}) sera définitivement supprimée</li>
+                  <li>{demande.lines.length} article{demande.lines.length > 1 ? 's' : ''} représentant {getTotalQuantity()} unités seront perdu{getTotalQuantity() > 1 ? 'es' : 'e'}</li>
+                  <li>Le montant estimé de {getTotalEstimatedAmount()} DA sera perdu</li>
+                  <li>L&apos;historique et les commentaires associés seront effacés</li>
                   <li>Cette action ne pourra pas être annulée</li>
                 </ul>
               </div>

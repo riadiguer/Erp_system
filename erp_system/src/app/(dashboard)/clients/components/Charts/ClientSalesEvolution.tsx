@@ -35,8 +35,8 @@ const MOCK: Point[] = [
 
 export default function ClientSalesEvolution({ data = MOCK, height = 260, currencyLabel = "DA" }: Props) {
   return (
-    <div className="w-full h-[--h]" style={{ ["--h" as any]: `${height}px` }}>
-      <h4 className="text-sm font-medium mb-2">Évolution du chiffre d’affaires</h4>
+    <div className="w-full h-[--h]" style={{ "--h": `${height}px` } as React.CSSProperties}>
+      <h4 className="text-sm font-medium mb-2">Évolution du chiffre d&apos;affaires</h4>
       <div className="bg-white rounded p-3 shadow-sm">
         <ResponsiveContainer width="100%" height={height - 48}>
           <AreaChart data={data} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
@@ -51,7 +51,7 @@ export default function ClientSalesEvolution({ data = MOCK, height = 260, curren
             <XAxis dataKey="date" tick={{ fontSize: 12 }} />
             <YAxis tick={{ fontSize: 12 }} />
             <Tooltip
-              formatter={(value: any) => [`${Number(value).toLocaleString()} ${currencyLabel}`, "CA"]}
+              formatter={(value: number | string) => [`${Number(value).toLocaleString()} ${currencyLabel}`, "CA"]}
               labelFormatter={(label) => `Période: ${label}`}
             />
             <Legend verticalAlign="top" height={20} />

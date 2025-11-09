@@ -13,14 +13,10 @@ import {
   DollarSign,
   Calendar,
   TrendingUp,
-  TrendingDown,
   AlertTriangle,
   Phone,
   Mail,
   MapPin,
-  FileText,
-  Package,
-  RotateCcw,
   CreditCard,
   MoreHorizontal
 } from 'lucide-react'
@@ -33,17 +29,54 @@ import DeleteInvoiceModal from './components/DeleteInvoiceModal'
 import SupplierDetailsModal from './components/SupplierDetailsModal'
 import PayInvoiceModal from './components/PayInvoiceModal'
 
+// Define types for better type safety
+interface Supplier {
+  id: string;
+  nom: string;
+  email: string;
+  telephone: string;
+  adresse: string;
+  dateCreation: string;
+  statut: string;
+  totalAchats: number;
+  totalFactures: number;
+  totalDettes: number;
+  dernierAchat: string;
+}
+
+interface Invoice {
+  id: string;
+  numeroFacture: string;
+  fournisseurId: string;
+  dateFacture: string;
+  dateEcheance: string;
+  type: 'Achat' | 'Retour' | 'Avoir';
+  statut:  'Payée' | 'En attente' | 'En retard' | 'Traitée' | 'Annulée';
+  montantHT: number;
+  montantTTC: number;
+  montantPaye: number;
+  montantDu: number;
+  produits: Array<{ nom: string; quantite: number; prixUnitaire: number }>;
+  commentaires: string;
+}
+
+interface PaymentData {
+  factureId: string;
+  montantPaiement: number;
+  nouveauStatut: Invoice['statut'];
+}
+
 export default function InvoicesPage() {
   const [showModal, setShowModal] = useState(false)
   const [modalType, setModalType] = useState('')
-  const [selectedItem, setSelectedItem] = useState(null)
-  const [selectedSupplier, setSelectedSupplier] = useState(null)
+  const [selectedItem, setSelectedItem] = useState<Invoice | null>(null)
+  const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
-  const [showMobileMenu, setShowMobileMenu] = useState({})
-  const [viewMode, setViewMode] = useState('suppliers') // 'suppliers' ou 'invoices'
+  const [showMobileMenu, setShowMobileMenu] = useState<Record<string, boolean>>({})
+  const [viewMode, setViewMode] = useState<'suppliers' | 'invoices'>('suppliers') // 'suppliers' ou 'invoices'
   
   // Données d'exemple pour les fournisseurs
-  const [fournisseurs, setFournisseurs] = useState([
+  const [fournisseurs, setFournisseurs] = useState<Supplier[]>([
     {
       id: 'F001',
       nom: 'TechSupply SARL',
@@ -99,7 +132,7 @@ export default function InvoicesPage() {
   ])
 
   // Données d'exemple pour les factures
-  const [factures, setFactures] = useState([
+  const [factures, setFactures] = useState<Invoice[]>([
     {
       id: 'INV001',
       numeroFacture: 'FAC-2024-001',
@@ -187,9 +220,9 @@ export default function InvoicesPage() {
     }
   ])
 
-  const openModal = (type, item = null) => {
+  const openModal = (type: string, item: Invoice | Supplier | { fournisseurId: string } | null = null) => {
     setModalType(type)
-    setSelectedItem(item)
+    setSelectedItem(item as Invoice | null)
     setShowModal(true)
     setShowMobileMenu({})
   }
@@ -200,7 +233,7 @@ export default function InvoicesPage() {
     setSelectedItem(null)
   }
 
-  const handleSelectSupplier = (supplier) => {
+  const handleSelectSupplier = (supplier: Supplier) => {
     setSelectedSupplier(supplier)
     setViewMode('invoices')
   }
@@ -210,7 +243,7 @@ export default function InvoicesPage() {
     setViewMode('suppliers')
   }
 
-  const handlePayInvoice = (paymentData) => {
+  const handlePayInvoice = (paymentData: PaymentData) => {
     // Mettre à jour la facture avec le nouveau paiement
     setFactures(prev => prev.map(f => 
       f.id === paymentData.factureId 
@@ -237,11 +270,11 @@ export default function InvoicesPage() {
     closeModal()
   }
 
-  const getSupplierFactures = (supplierId) => {
+  const getSupplierFactures = (supplierId: string) => {
     return factures.filter(f => f.fournisseurId === supplierId)
   }
 
-  const getSupplierStats = (supplierId) => {
+  const getSupplierStats = (supplierId: string) => {
     const supplierFactures = getSupplierFactures(supplierId)
     const achats = supplierFactures.filter(f => f.type === 'Achat')
     const retours = supplierFactures.filter(f => f.type === 'Retour')
@@ -269,7 +302,7 @@ export default function InvoicesPage() {
       )
     : []
 
-  const getStatutColor = (statut) => {
+  const getStatutColor = (statut: string) => {
     switch (statut) {
       case 'Payée': return 'text-green-700 bg-green-100 border-green-200'
       case 'En attente': return 'text-orange-700 bg-orange-100 border-orange-200'
@@ -280,7 +313,7 @@ export default function InvoicesPage() {
     }
   }
 
-  const getTypeColor = (type) => {
+  const getTypeColor = (type: string) => {
     switch (type) {
       case 'Achat': return 'text-blue-700 bg-blue-100 border-blue-200'
       case 'Retour': return 'text-red-700 bg-red-100 border-red-200'
@@ -289,7 +322,7 @@ export default function InvoicesPage() {
     }
   }
 
-  const toggleMobileMenu = (id) => {
+  const toggleMobileMenu = (id: string) => {
     setShowMobileMenu(prev => ({
       ...prev,
       [id]: !prev[id]
@@ -927,7 +960,7 @@ export default function InvoicesPage() {
           isOpen={showModal}
           onClose={closeModal}
           facture={selectedItem}
-          fournisseur={fournisseurs.find(f => f.id === selectedItem.fournisseurId)}
+          fournisseur={fournisseurs.find(f => f.id === selectedItem.fournisseurId)!}
           getStatutColor={getStatutColor}
           getTypeColor={getTypeColor}
         />
@@ -939,7 +972,7 @@ export default function InvoicesPage() {
           onClose={closeModal}
           onSave={() => closeModal()}
           facture={selectedItem}
-          fournisseur={fournisseurs.find(f => f.id === selectedItem.fournisseurId)}
+          fournisseur={fournisseurs.find(f => f.id === selectedItem.fournisseurId)!}
         />
       )}
 
@@ -958,7 +991,7 @@ export default function InvoicesPage() {
           onClose={closeModal}
           onPay={handlePayInvoice}
           facture={selectedItem}
-          fournisseur={fournisseurs.find(f => f.id === selectedItem.fournisseurId)}
+          fournisseur={fournisseurs.find(f => f.id === selectedItem.fournisseurId)!}
         />
       )}
 
@@ -966,9 +999,9 @@ export default function InvoicesPage() {
         <SupplierDetailsModal
           isOpen={showModal}
           onClose={closeModal}
-          fournisseur={selectedItem}
-          factures={getSupplierFactures(selectedItem.id)}
-          stats={getSupplierStats(selectedItem.id)}
+          fournisseur={selectedItem as unknown as Supplier}
+          factures={getSupplierFactures((selectedItem as unknown as Supplier).id)}
+          stats={getSupplierStats((selectedItem as unknown as Supplier).id)}
         />
       )}
 

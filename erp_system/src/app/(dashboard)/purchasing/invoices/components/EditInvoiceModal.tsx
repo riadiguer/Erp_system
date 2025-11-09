@@ -2,36 +2,57 @@
 import React, { useState, useEffect } from 'react'
 import { X, Plus, Check, Building, AlertTriangle, Receipt, Calendar, DollarSign, Package, Edit } from 'lucide-react'
 
+interface Produit {
+  nom: string
+  quantite: number
+  prixUnitaire: number
+}
+
+interface Facture {
+  id: string
+  numeroFacture: string
+  fournisseurId: string
+  dateFacture: string
+  dateEcheance: string
+  type: 'Achat' | 'Retour' | 'Avoir'
+  statut: string
+  montantHT: number
+  montantTTC: number
+  montantPaye: number
+  montantDu: number
+  produits: Produit[]
+  commentaires: string
+}
+
+interface Fournisseur {
+  id: string
+  nom: string
+  email: string
+  telephone: string
+  adresse: string
+}
+
+interface FormData {
+  numeroFacture: string
+  dateFacture: string
+  dateEcheance: string
+  type: 'Achat' | 'Retour' | 'Avoir'
+  statut: string
+  montantHT: number
+  montantTTC: number
+  montantPaye: number
+  montantDu: number
+  produits: Produit[]
+  commentaires: string
+  tauxTVA: number
+}
+
 interface EditInvoiceModalProps {
   isOpen: boolean
   onClose: () => void
-  onSave: (formData: any) => void
-  facture: {
-    id: string
-    numeroFacture: string
-    fournisseurId: string
-    dateFacture: string
-    dateEcheance: string
-    type: 'Achat' | 'Retour' | 'Avoir'
-    statut: string
-    montantHT: number
-    montantTTC: number
-    montantPaye: number
-    montantDu: number
-    produits: Array<{
-      nom: string
-      quantite: number
-      prixUnitaire: number
-    }>
-    commentaires: string
-  }
-  fournisseur: {
-    id: string
-    nom: string
-    email: string
-    telephone: string
-    adresse: string
-  }
+  onSave: (formData: FormData) => void
+  facture: Facture
+  fournisseur: Fournisseur
 }
 
 export default function EditInvoiceModal({ 
@@ -41,21 +62,17 @@ export default function EditInvoiceModal({
   facture,
   fournisseur
 }: EditInvoiceModalProps) {
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<FormData>({
     numeroFacture: '',
     dateFacture: '',
     dateEcheance: '',
-    type: 'Achat' as 'Achat' | 'Retour' | 'Avoir',
+    type: 'Achat',
     statut: 'En attente',
     montantHT: 0,
     montantTTC: 0,
     montantPaye: 0,
     montantDu: 0,
-    produits: [] as Array<{
-      nom: string
-      quantite: number
-      prixUnitaire: number
-    }>,
+    produits: [],
     commentaires: '',
     tauxTVA: 20
   })
@@ -68,7 +85,7 @@ export default function EditInvoiceModal({
     montantPaye: ''
   })
 
-  const [newProduit, setNewProduit] = useState({
+  const [newProduit, setNewProduit] = useState<Produit>({
     nom: '',
     quantite: 1,
     prixUnitaire: 0
@@ -114,9 +131,9 @@ export default function EditInvoiceModal({
     }
 
     if (!formData.dateEcheance) {
-      newErrors.dateEcheance = 'La date d\'échéance est requise'
+      newErrors.dateEcheance = 'La date d&apos;échéance est requise'
     } else if (new Date(formData.dateEcheance) < new Date(formData.dateFacture)) {
-      newErrors.dateEcheance = 'La date d\'échéance doit être après la date de facture'
+      newErrors.dateEcheance = 'La date d&apos;échéance doit être après la date de facture'
     }
 
     if (formData.produits.length === 0) {
@@ -135,7 +152,7 @@ export default function EditInvoiceModal({
     return !Object.values(newErrors).some(error => error !== '')
   }
 
-  const calculateMontants = (produits, tauxTVA, type = formData.type) => {
+  const calculateMontants = (produits: Produit[], tauxTVA: number, type = formData.type) => {
     const sousTotal = produits.reduce((sum, p) => sum + (p.quantite * p.prixUnitaire), 0)
     const montantHT = type === 'Retour' ? -Math.abs(sousTotal) : sousTotal
     const montantTTC = montantHT + (montantHT * tauxTVA / 100)
@@ -156,7 +173,7 @@ export default function EditInvoiceModal({
 
   const handleSave = () => {
     if (validateForm()) {
-      const finalData = {
+      const finalData: FormData = {
         ...formData,
         montantDu: Math.max(0, formData.montantTTC - formData.montantPaye)
       }
@@ -176,13 +193,13 @@ export default function EditInvoiceModal({
     }
   }
 
-  const removeProduit = (index) => {
+  const removeProduit = (index: number) => {
     const updatedProduits = formData.produits.filter((_, i) => i !== index)
     setFormData(prev => ({ ...prev, produits: updatedProduits }))
     updateMontants(updatedProduits)
   }
 
-  const updateProduit = (index, field, value) => {
+  const updateProduit = (index: number, field: keyof Produit, value: string) => {
     const updatedProduits = formData.produits.map((p, i) => 
       i === index ? { ...p, [field]: field === 'quantite' || field === 'prixUnitaire' ? parseFloat(value) || 0 : value } : p
     )
@@ -190,7 +207,7 @@ export default function EditInvoiceModal({
     updateMontants(updatedProduits)
   }
 
-  const handleTypeChange = (newType) => {
+  const handleTypeChange = (newType: 'Achat' | 'Retour' | 'Avoir') => {
     setFormData(prev => ({ ...prev, type: newType }))
     // Recalculer les montants avec le nouveau type
     const { montantHT, montantTTC } = calculateMontants(formData.produits, formData.tauxTVA, newType)
@@ -205,7 +222,7 @@ export default function EditInvoiceModal({
     }))
   }
 
-  const handleMontantPayeChange = (value) => {
+  const handleMontantPayeChange = (value: string) => {
     const montantPaye = parseFloat(value) || 0
     setFormData(prev => ({
       ...prev,
@@ -218,7 +235,7 @@ export default function EditInvoiceModal({
     }
   }
 
-  const handleTVAChange = (value) => {
+  const handleTVAChange = (value: string) => {
     const tauxTVA = parseFloat(value) || 0
     setFormData(prev => ({ ...prev, tauxTVA }))
     updateMontants(formData.produits, tauxTVA)
@@ -357,7 +374,7 @@ export default function EditInvoiceModal({
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 <Calendar className="w-4 h-4 inline mr-2" />
-                Date d'échéance *
+                Date d&apos;échéance *
               </label>
               <input
                 type="date"

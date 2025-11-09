@@ -58,8 +58,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await AuthApi.login(payload);
         await refreshMe();
         return true;
-      } catch (e: any) {
-        setError(e?.detail || 'Invalid credentials');
+      } catch (e: unknown) {
+        const errorMessage = e && typeof e === 'object' && 'detail' in e 
+          ? String(e.detail) 
+          : 'Invalid credentials';
+        setError(errorMessage);
         return false;
       }
     },

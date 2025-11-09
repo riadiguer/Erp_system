@@ -94,8 +94,8 @@ export default function SupplierDetailsModal({
     }).format(amount)
   }
 
-  const getMonthlyData = () => {
-    const monthlyStats = {}
+  const getMonthlyData = (): Record<string, { achats: number; retours: number; factures: number }> => {
+    const monthlyStats: Record<string, { achats: number; retours: number; factures: number }> = {}
     factures.forEach(facture => {
       const month = new Date(facture.dateFacture).toLocaleDateString('fr-FR', { 
         year: 'numeric', 
@@ -161,7 +161,7 @@ export default function SupplierDetailsModal({
   const monthlyData = getMonthlyData()
 
   const tabs = [
-    { id: 'overview', label: 'Vue d\'ensemble', icon: Activity },
+    { id: 'overview', label: 'Vue d&apos;ensemble', icon: Activity },
     { id: 'finances', label: 'Finances', icon: DollarSign },
     { id: 'history', label: 'Historique', icon: FileText },
     { id: 'analytics', label: 'Analyses', icon: BarChart3 }
@@ -347,7 +347,7 @@ export default function SupplierDetailsModal({
                   <div className="grid grid-cols-2 gap-4">
                     <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-6 border border-blue-200">
                       <div className="flex items-center justify-between mb-3">
-                        <h4 className="font-semibold text-blue-900">Chiffre d'affaires</h4>
+                        <h4 className="font-semibold text-blue-900">Chiffre d&apos;affaires</h4>
                         <TrendingUp className="w-5 h-5 text-blue-600" />
                       </div>
                       <p className="text-2xl font-bold text-blue-900">{formatCurrency(stats.totalAchats)}</p>
@@ -475,7 +475,7 @@ export default function SupplierDetailsModal({
 
               {/* Timeline des factures */}
               <div className="space-y-4">
-                {getFilteredFactures().map((facture, index) => (
+                {getFilteredFactures().map((facture) => (
                   <div key={facture.id} className="bg-white border border-gray-200 rounded-xl p-4 hover:shadow-md transition-shadow">
                     <div className="flex items-start justify-between">
                       <div className="flex items-start space-x-4">
@@ -616,7 +616,7 @@ export default function SupplierDetailsModal({
                 <div className="bg-white border border-gray-200 rounded-xl p-6">
                   <h4 className="font-semibold text-gray-900 mb-4 flex items-center">
                     <AlertTriangle className="w-5 h-5 mr-2 text-orange-600" />
-                    Points d'attention
+                    Points d&apos;attention
                   </h4>
                   <div className="space-y-3">
                     {stats.facturesEnRetard > 0 && (

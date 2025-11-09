@@ -1,24 +1,13 @@
 'use client'
 import React from 'react'
-import { X, Eye, ShoppingCart, Calendar, User, Package, MessageSquare, AlertTriangle, Check } from 'lucide-react'
+import { X, Eye, Calendar, User, Package, MessageSquare, AlertTriangle, Check, Building2, Hash, DollarSign } from 'lucide-react'
+import type { DemandRequest } from '@/lib/features/purchasing/api'
+import { priorityFromApi, statusFromApi } from '@/lib/features/purchasing/api'
 
 interface ViewDemandModalProps {
   isOpen: boolean
   onClose: () => void
-  demande: {
-    id: string
-    utilisateur: { id: string; nom: string }
-    dateCreation: string
-    priorite: string
-    statut: string
-    produits: Array<{
-      id: string
-      nom: string
-      type: 'produit' | 'matiere'
-      quantite: number
-    }>
-    commentaires: string
-  }
+  demande: DemandRequest | null
   getPrioriteColor: (priorite: string) => string
   getStatutColor: (statut: string) => string
 }
@@ -43,16 +32,23 @@ export default function ViewDemandModal({
   }
 
   const getTotalQuantity = () => {
-    return demande.produits.reduce((total, produit) => total + produit.quantite, 0)
+    return demande.lines.reduce((total, line) => total + parseFloat(line.quantity || '0'), 0)
   }
 
-  const getProduitsCount = () => {
-    return demande.produits.filter(p => p.type === 'produit').length
+  const getTotalEstimatedAmount = () => {
+    if (demande.total_estimated_amount) {
+      return parseFloat(demande.total_estimated_amount).toFixed(2)
+    }
+    return demande.lines.reduce((total, line) => {
+      const qty = parseFloat(line.quantity || '0')
+      const price = parseFloat(line.estimated_price || '0')
+      return total + (qty * price)
+    }, 0).toFixed(2)
   }
 
-  const getMatieresCount = () => {
-    return demande.produits.filter(p => p.type === 'matiere').length
-  }
+  // Convert API status and priority to French
+  const prioriteFr = priorityFromApi(demande.priority)
+  const statutFr = statusFromApi(demande.status)
 
   return (
     <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
@@ -66,7 +62,7 @@ export default function ViewDemandModal({
             </div>
             <div>
               <h3 className="text-xl font-bold text-gray-900">Détails de la demande</h3>
-              <p className="text-sm text-gray-600">Consultation complète de la demande d'achat</p>
+              <p className="text-sm text-gray-600">Consultation complète de la demande d&apos;achat</p>
             </div>
           </div>
           <button 
@@ -85,10 +81,10 @@ export default function ViewDemandModal({
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="bg-white p-4 rounded-lg shadow-sm">
                 <div className="flex items-center space-x-3 mb-2">
-                  <ShoppingCart className="w-5 h-5 text-blue-600" />
+                  <Hash className="w-5 h-5 text-blue-600" />
                   <span className="text-sm font-medium text-gray-600">Numéro</span>
                 </div>
-                <p className="text-2xl font-bold text-gray-900">{demande.id}</p>
+                <p className="text-2xl font-bold text-gray-900">{demande.number}</p>
               </div>
               
               <div className="bg-white p-4 rounded-lg shadow-sm">
@@ -97,7 +93,7 @@ export default function ViewDemandModal({
                   <span className="text-sm font-medium text-gray-600">Date de création</span>
                 </div>
                 <p className="text-lg font-semibold text-gray-900">
-                  {formatDate(demande.dateCreation)}
+                  {formatDate(demande.date)}
                 </p>
               </div>
 
@@ -106,7 +102,7 @@ export default function ViewDemandModal({
                   <Package className="w-5 h-5 text-blue-600" />
                   <span className="text-sm font-medium text-gray-600">Total articles</span>
                 </div>
-                <p className="text-2xl font-bold text-gray-900">{getTotalQuantity()}</p>
+                <p className="text-2xl font-bold text-gray-900">{demande.lines.length}</p>
               </div>
             </div>
           </div>
@@ -120,14 +116,21 @@ export default function ViewDemandModal({
               <h4 className="text-xl font-bold text-gray-900">Informations du demandeur</h4>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="bg-white p-4 rounded-lg">
                 <span className="text-sm font-medium text-gray-600 block mb-1">Nom complet</span>
-                <p className="text-lg font-bold text-gray-900">{demande.utilisateur.nom}</p>
+                <p className="text-lg font-bold text-gray-900">{demande.requester_name}</p>
               </div>
               <div className="bg-white p-4 rounded-lg">
-                <span className="text-sm font-medium text-gray-600 block mb-1">ID Utilisateur</span>
-                <p className="text-lg font-bold text-gray-900">{demande.utilisateur.id}</p>
+                <span className="text-sm font-medium text-gray-600 block mb-1">Site</span>
+                <p className="text-lg font-bold text-gray-900 flex items-center">
+                  <Building2 className="w-4 h-4 mr-2 text-gray-500" />
+                  {demande.site}
+                </p>
+              </div>
+              <div className="bg-white p-4 rounded-lg">
+                <span className="text-sm font-medium text-gray-600 block mb-1">Catégorie</span>
+                <p className="text-lg font-bold text-gray-900">{demande.category}</p>
               </div>
             </div>
           </div>
@@ -143,11 +146,11 @@ export default function ViewDemandModal({
               <div className="bg-white border border-gray-200 rounded-lg p-6">
                 <span className="text-sm font-medium text-gray-600 block mb-3">Niveau de priorité</span>
                 <div className="flex items-center space-x-3">
-                  <span className={`inline-flex px-4 py-2 text-lg font-bold rounded-xl border-2 ${getPrioriteColor(demande.priorite)}`}>
-                    {demande.priorite === 'Haute' && '🔴'}
-                    {demande.priorite === 'Moyenne' && '🟡'}
-                    {demande.priorite === 'Basse' && '🟢'}
-                    {' '}{demande.priorite}
+                  <span className={`inline-flex px-4 py-2 text-lg font-bold rounded-xl border-2 ${getPrioriteColor(prioriteFr)}`}>
+                    {prioriteFr === 'Haute' && '🔴'}
+                    {prioriteFr === 'Moyenne' && '🟡'}
+                    {prioriteFr === 'Basse' && '🟢'}
+                    {' '}{prioriteFr}
                   </span>
                 </div>
               </div>
@@ -155,77 +158,116 @@ export default function ViewDemandModal({
               <div className="bg-white border border-gray-200 rounded-lg p-6">
                 <span className="text-sm font-medium text-gray-600 block mb-3">Statut actuel</span>
                 <div className="flex items-center space-x-3">
-                  <span className={`inline-flex px-4 py-2 text-lg font-bold rounded-xl border-2 ${getStatutColor(demande.statut)}`}>
-                    {demande.statut}
+                  <span className={`inline-flex px-4 py-2 text-lg font-bold rounded-xl border-2 ${getStatutColor(statutFr)}`}>
+                    {statutFr}
                   </span>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Résumé des articles */}
+          {/* Date nécessaire */}
+          {demande.needed_date && (
+            <div className="bg-purple-50 border border-purple-200 rounded-xl p-6">
+              <div className="flex items-center space-x-3">
+                <Calendar className="w-5 h-5 text-purple-600" />
+                <div>
+                  <span className="text-sm font-medium text-gray-600 block">Date nécessaire</span>
+                  <p className="text-lg font-bold text-gray-900">{formatDate(demande.needed_date)}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Résumé financier */}
           <div className="bg-green-50 border border-green-200 rounded-xl p-6">
             <h4 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
-              <Package className="w-5 h-5 mr-2 text-green-600" />
-              Résumé des articles
+              <DollarSign className="w-5 h-5 mr-2 text-green-600" />
+              Résumé financier
             </h4>
             
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="bg-white p-4 rounded-lg shadow-sm border border-green-200">
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-blue-600">{getProduitsCount()}</div>
-                  <div className="text-sm text-gray-600">Produits</div>
+                  <div className="text-2xl font-bold text-blue-600">{demande.lines.length}</div>
+                  <div className="text-sm text-gray-600">Articles</div>
                 </div>
               </div>
               <div className="bg-white p-4 rounded-lg shadow-sm border border-green-200">
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-green-600">{getMatieresCount()}</div>
-                  <div className="text-sm text-gray-600">Matières premières</div>
-                </div>
-              </div>
-              <div className="bg-white p-4 rounded-lg shadow-sm border border-green-200">
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-purple-600">{getTotalQuantity()}</div>
+                  <div className="text-2xl font-bold text-green-600">{getTotalQuantity()}</div>
                   <div className="text-sm text-gray-600">Quantité totale</div>
+                </div>
+              </div>
+              <div className="bg-white p-4 rounded-lg shadow-sm border border-green-200">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-purple-600">{getTotalEstimatedAmount()} DA</div>
+                  <div className="text-sm text-gray-600">Montant estimé</div>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Liste détaillée des produits */}
+          {/* Liste détaillée des articles */}
           <div>
             <h4 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
               <Package className="w-5 h-5 mr-2 text-gray-600" />
-              Articles demandés ({demande.produits.length})
+              Articles demandés ({demande.lines.length})
             </h4>
             
             <div className="space-y-4">
-              {demande.produits.map((produit, index) => (
-                <div key={produit.id} className="border border-gray-200 rounded-xl p-6 hover:shadow-md transition-shadow bg-white">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-4">
-                      <div className="flex items-center justify-center w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full text-white font-bold text-lg shadow-lg">
+              {demande.lines.map((line, index) => (
+                <div key={line.id || index} className="border border-gray-200 rounded-xl p-6 hover:shadow-md transition-shadow bg-white">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-start space-x-4 flex-1">
+                      <div className="flex items-center justify-center w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full text-white font-bold text-lg shadow-lg flex-shrink-0">
                         {index + 1}
                       </div>
-                      <div>
-                        <h5 className="text-lg font-bold text-gray-900 mb-1">{produit.nom}</h5>
-                        <div className="flex items-center space-x-2">
-                          <div className={`w-3 h-3 rounded-full ${produit.type === 'produit' ? 'bg-blue-500' : 'bg-green-500'}`} />
-                          <span className={`px-3 py-1 text-sm font-medium rounded-full border-2 ${
-                            produit.type === 'produit' 
-                              ? 'bg-blue-100 text-blue-800 border-blue-200' 
-                              : 'bg-green-100 text-green-800 border-green-200'
-                          }`}>
-                            {produit.type === 'produit' ? '🔧 Produit' : '🧱 Matière première'}
-                          </span>
+                      <div className="flex-1">
+                        <h5 className="text-lg font-bold text-gray-900 mb-2">{line.material_name}</h5>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                          <div>
+                            <span className="text-gray-600 block">ID Matériel</span>
+                            <span className="font-semibold text-gray-900">{line.material_id}</span>
+                          </div>
+                          <div>
+                            <span className="text-gray-600 block">Unité</span>
+                            <span className="font-semibold text-gray-900">{line.uom}</span>
+                          </div>
+                          <div>
+                            <span className="text-gray-600 block">Quantité</span>
+                            <span className="font-semibold text-blue-600">{line.quantity}</span>
+                          </div>
+                          {line.estimated_price && (
+                            <div>
+                              <span className="text-gray-600 block">Prix estimé</span>
+                              <span className="font-semibold text-green-600">{parseFloat(line.estimated_price).toFixed(2)} DA</span>
+                            </div>
+                          )}
                         </div>
+                        {line.suggested_supplier && (
+                          <div className="mt-3 text-sm">
+                            <span className="text-gray-600">Fournisseur suggéré: </span>
+                            <span className="font-semibold text-gray-900">{line.suggested_supplier}</span>
+                          </div>
+                        )}
+                        {line.needed_date && (
+                          <div className="mt-2 text-sm">
+                            <span className="text-gray-600">Date nécessaire: </span>
+                            <span className="font-semibold text-purple-600">{formatDate(line.needed_date)}</span>
+                          </div>
+                        )}
                       </div>
                     </div>
                     
-                    <div className="text-right bg-gray-50 rounded-lg p-4 min-w-[100px]">
-                      <div className="text-sm font-medium text-gray-600 mb-1">Quantité</div>
-                      <div className="text-3xl font-bold text-gray-900">{produit.quantite}</div>
-                    </div>
+                    {line.estimated_price && (
+                      <div className="text-right bg-gray-50 rounded-lg p-4 ml-4 flex-shrink-0">
+                        <div className="text-sm font-medium text-gray-600 mb-1">Total</div>
+                        <div className="text-2xl font-bold text-gray-900">
+                          {(parseFloat(line.quantity) * parseFloat(line.estimated_price)).toFixed(2)} DA
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
@@ -233,7 +275,7 @@ export default function ViewDemandModal({
           </div>
 
           {/* Commentaires */}
-          {demande.commentaires && (
+          {demande.comment && (
             <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6">
               <div className="flex items-center space-x-3 mb-4">
                 <div className="p-2 bg-yellow-500 rounded-lg">
@@ -244,8 +286,68 @@ export default function ViewDemandModal({
               
               <div className="bg-white p-4 rounded-lg border border-yellow-200">
                 <p className="text-gray-700 leading-relaxed text-base">
-                  {demande.commentaires}
+                  {demande.comment}
                 </p>
+              </div>
+            </div>
+          )}
+
+          {/* Informations d'approbation/rejet */}
+          {(demande.approved_by || demande.rejected_by) && (
+            <div className={`border rounded-xl p-6 ${demande.approved_by ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+              <h4 className="text-xl font-bold text-gray-900 mb-4">
+                {demande.approved_by ? '✓ Approuvée' : '✗ Rejetée'}
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {demande.approved_by && (
+                  <>
+                    <div className="bg-white p-4 rounded-lg">
+                      <span className="text-sm font-medium text-gray-600 block mb-1">Approuvée par</span>
+                      <p className="text-lg font-bold text-gray-900">{demande.approved_by}</p>
+                    </div>
+                    <div className="bg-white p-4 rounded-lg">
+                      <span className="text-sm font-medium text-gray-600 block mb-1">Date d&apos;approbation</span>
+                      <p className="text-lg font-bold text-gray-900">{formatDate(demande.approved_date!)}</p>
+                    </div>
+                  </>
+                )}
+                {demande.rejected_by && (
+                  <>
+                    <div className="bg-white p-4 rounded-lg">
+                      <span className="text-sm font-medium text-gray-600 block mb-1">Rejetée par</span>
+                      <p className="text-lg font-bold text-gray-900">{demande.rejected_by}</p>
+                    </div>
+                    <div className="bg-white p-4 rounded-lg">
+                      <span className="text-sm font-medium text-gray-600 block mb-1">Date de rejet</span>
+                      <p className="text-lg font-bold text-gray-900">{formatDate(demande.rejected_date!)}</p>
+                    </div>
+                    {demande.rejection_reason && (
+                      <div className="bg-white p-4 rounded-lg md:col-span-2">
+                        <span className="text-sm font-medium text-gray-600 block mb-1">Raison du rejet</span>
+                        <p className="text-base text-gray-900">{demande.rejection_reason}</p>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Conversion en PO */}
+          {demande.converted_to_po && (
+            <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-6">
+              <h4 className="text-xl font-bold text-gray-900 mb-4">
+                🔄 Convertie en bon de commande
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-white p-4 rounded-lg">
+                  <span className="text-sm font-medium text-gray-600 block mb-1">Numéro PO</span>
+                  <p className="text-lg font-bold text-indigo-600">{demande.converted_to_po}</p>
+                </div>
+                <div className="bg-white p-4 rounded-lg">
+                  <span className="text-sm font-medium text-gray-600 block mb-1">Date de conversion</span>
+                  <p className="text-lg font-bold text-gray-900">{formatDate(demande.converted_date!)}</p>
+                </div>
               </div>
             </div>
           )}

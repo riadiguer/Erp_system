@@ -1,20 +1,35 @@
 import React from 'react'
 import { useState } from 'react'
-import { User, Mail, Phone, X, Shield, Trash2, Check, AlertTriangle, Edit3, Crown, Eye, EyeOff } from 'lucide-react'
+import { User, Mail, X, Shield, Trash2, Check, AlertTriangle, Edit3, Crown, Eye, EyeOff } from 'lucide-react'
 
-export default function UserDetailsModal({ open, onClose, user, onUpdate, allRoles }: {
-  open: boolean, 
-  onClose: () => void,
-  user: any,
-  onUpdate: (user: any) => void
-  allRoles: { id: number, name: string }[]
-}) {
-  const [form, setForm] = useState(user || {})
+interface UserFormData {
+  id: number;
+  username: string;
+  email: string;
+  first_name: string;
+  last_name: string;
+  roles: string[];
+  status: 'actif' | 'suspendu';
+  is_active?: boolean;
+}
+
+interface UserDetailsModalProps {
+  open: boolean;
+  onClose: () => void;
+  user: UserFormData | null;
+  onUpdate: (user: Partial<UserFormData> & { _delete?: boolean }) => Promise<void> | void;
+  allRoles: { id: number; name: string }[];
+}
+
+export default function UserDetailsModal({ open, onClose, user, onUpdate, allRoles }: UserDetailsModalProps) {
+  const [form, setForm] = useState<UserFormData>(user || {} as UserFormData)
   const [isLoading, setIsLoading] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   React.useEffect(() => {
-    setForm(user || {})
+    setForm(user || {} as UserFormData)
+    setError(null)
   }, [user, open])
 
   if (!open || !user) return null
@@ -24,16 +39,41 @@ export default function UserDetailsModal({ open, onClose, user, onUpdate, allRol
   }
 
   const handleSubmit = async () => {
+    setError(null)
     setIsLoading(true)
-    await new Promise(resolve => setTimeout(resolve, 800))
-    onUpdate(form)
-    setIsLoading(false)
-    onClose()
+    
+    try {
+      // Prepare update payload
+      const updatePayload = {
+        id: form.id,
+        username: form.username,
+        email: form.email,
+        first_name: form.first_name,
+        last_name: form.last_name,
+        roles: form.roles || [],
+        is_active: form.status === 'actif',
+      }
+      
+      console.log('Submitting update payload:', updatePayload)
+      console.log('Form status:', form.status)
+      
+      await onUpdate(updatePayload)
+      onClose()
+    } catch (err) {
+      console.error('Submit error:', err)
+      setError((err as Error).message || 'Erreur lors de la mise à jour')
+    } finally {
+      setIsLoading(false)
+    }
   }
 
-  const handleDelete = () => {
-    onUpdate({ ...form, _delete: true })
-    onClose()
+  const handleDelete = async () => {
+    try {
+      await onUpdate({ id: form.id, _delete: true })
+      onClose()
+    } catch (err) {
+      setError((err as Error).message || 'Erreur lors de la suppression')
+    }
   }
 
   const handleBackdropClick = (e: React.MouseEvent) => {
@@ -97,6 +137,13 @@ export default function UserDetailsModal({ open, onClose, user, onUpdate, allRol
 
         {/* Main Content */}
         <div className="flex-1 overflow-y-auto p-8">
+          {/* Error Message */}
+          {error && (
+            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
+              {error}
+            </div>
+          )}
+
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             
             {/* Left Column - Personal Information */}
@@ -111,7 +158,7 @@ export default function UserDetailsModal({ open, onClose, user, onUpdate, allRol
               <div className="space-y-6">
                 <div className="group">
                   <label className="text-sm font-semibold text-gray-700 mb-2 block">
-                    Nom d'utilisateur
+                    Nom d&apos;utilisateur
                   </label>
                   <div className="relative">
                     <User size={18} className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" />
@@ -119,6 +166,38 @@ export default function UserDetailsModal({ open, onClose, user, onUpdate, allRol
                       name="username"
                       value={form.username || ''}
                       placeholder="Nom d'utilisateur"
+                      className="w-full pl-12 pr-4 py-4 bg-gray-50 border-2 border-gray-100 rounded-2xl focus:border-indigo-400 focus:bg-white transition-all duration-300 outline-none text-gray-900 placeholder-gray-400"
+                      onChange={handleChange}
+                    />
+                  </div>
+                </div>
+
+                <div className="group">
+                  <label className="text-sm font-semibold text-gray-700 mb-2 block">
+                    Prénom
+                  </label>
+                  <div className="relative">
+                    <User size={18} className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                    <input
+                      name="first_name"
+                      value={form.first_name || ''}
+                      placeholder="Prénom"
+                      className="w-full pl-12 pr-4 py-4 bg-gray-50 border-2 border-gray-100 rounded-2xl focus:border-indigo-400 focus:bg-white transition-all duration-300 outline-none text-gray-900 placeholder-gray-400"
+                      onChange={handleChange}
+                    />
+                  </div>
+                </div>
+
+                <div className="group">
+                  <label className="text-sm font-semibold text-gray-700 mb-2 block">
+                    Nom
+                  </label>
+                  <div className="relative">
+                    <User size={18} className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                    <input
+                      name="last_name"
+                      value={form.last_name || ''}
+                      placeholder="Nom de famille"
                       className="w-full pl-12 pr-4 py-4 bg-gray-50 border-2 border-gray-100 rounded-2xl focus:border-indigo-400 focus:bg-white transition-all duration-300 outline-none text-gray-900 placeholder-gray-400"
                       onChange={handleChange}
                     />
@@ -136,23 +215,6 @@ export default function UserDetailsModal({ open, onClose, user, onUpdate, allRol
                       value={form.email || ''}
                       placeholder="exemple@email.com"
                       type="email"
-                      className="w-full pl-12 pr-4 py-4 bg-gray-50 border-2 border-gray-100 rounded-2xl focus:border-indigo-400 focus:bg-white transition-all duration-300 outline-none text-gray-900 placeholder-gray-400"
-                      onChange={handleChange}
-                    />
-                  </div>
-                </div>
-
-                <div className="group">
-                  <label className="text-sm font-semibold text-gray-700 mb-2 block">
-                    Numéro de téléphone
-                  </label>
-                  <div className="relative">
-                    <Phone size={18} className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                    <input
-                      name="phone"
-                      value={form.phone || ''}
-                      placeholder="+33 6 12 34 56 78"
-                      type="tel"
                       className="w-full pl-12 pr-4 py-4 bg-gray-50 border-2 border-gray-100 rounded-2xl focus:border-indigo-400 focus:bg-white transition-all duration-300 outline-none text-gray-900 placeholder-gray-400"
                       onChange={handleChange}
                     />
@@ -185,7 +247,7 @@ export default function UserDetailsModal({ open, onClose, user, onUpdate, allRol
                         <button
                           type="button"
                           className="p-1 rounded-full hover:bg-red-100 transition-colors group-hover:opacity-100 opacity-60"
-                          onClick={() => setForm((f: { roles: any[] }) => ({
+                          onClick={() => setForm((f: UserFormData) => ({
                             ...f,
                             roles: f.roles.filter((_: string, i: number) => i !== index)
                           }))}
@@ -211,7 +273,7 @@ export default function UserDetailsModal({ open, onClose, user, onUpdate, allRol
                     onChange={e => {
                       const value = e.target.value
                       if (value && !(form.roles || []).includes(value)) {
-                        setForm((f: { roles: any }) => ({
+                        setForm((f: UserFormData) => ({
                           ...f,
                           roles: [...(f.roles || []), value]
                         }))
@@ -235,6 +297,10 @@ export default function UserDetailsModal({ open, onClose, user, onUpdate, allRol
                   <span>Statut du compte</span>
                 </h3>
                 
+                <p className="text-sm text-gray-600 mb-4">
+                  Le statut du compte sera modifié lorsque vous cliquerez sur &quot;Enregistrer les modifications&quot; en bas.
+                </p>
+                
                 <div className="grid grid-cols-2 gap-3">
                   <button
                     type="button"
@@ -243,7 +309,7 @@ export default function UserDetailsModal({ open, onClose, user, onUpdate, allRol
                         ? 'bg-green-500 text-white shadow-lg transform scale-105' 
                         : 'bg-white text-green-600 border-2 border-green-200 hover:bg-green-50 hover:border-green-300'
                     }`}
-                    onClick={() => setForm((f: any) => ({ ...f, status: 'actif' }))}
+                    onClick={() => setForm((f: UserFormData) => ({ ...f, status: 'actif' }))}
                   >
                     <Check size={16} />
                     <span>Activer</span>
@@ -256,9 +322,7 @@ export default function UserDetailsModal({ open, onClose, user, onUpdate, allRol
                         : 'bg-white text-red-600 border-2 border-red-200 hover:bg-red-50 hover:border-red-300'
                     }`}
                     onClick={() => {
-                      if (window.confirm("Voulez-vous suspendre cet utilisateur ?")) {
-                        setForm((f: any) => ({ ...f, status: 'suspendu' }))
-                      }
+                      setForm((f: UserFormData) => ({ ...f, status: 'suspendu' }))
                     }}
                   >
                     <EyeOff size={16} />
@@ -279,7 +343,7 @@ export default function UserDetailsModal({ open, onClose, user, onUpdate, allRol
             </div>
             
             <p className="text-red-700 mb-6">
-              Cette action supprimera définitivement l'utilisateur et toutes ses données associées. Cette action est irréversible.
+              Cette action supprimera définitivement l&apos;utilisateur et toutes ses données associées. Cette action est irréversible.
             </p>
             
             {!showDeleteConfirm ? (
@@ -289,7 +353,7 @@ export default function UserDetailsModal({ open, onClose, user, onUpdate, allRol
                 className="px-6 py-3 bg-red-500 text-white rounded-xl hover:bg-red-600 transition-all duration-300 font-semibold flex items-center space-x-2 shadow-lg hover:shadow-xl transform hover:scale-105"
               >
                 <Trash2 size={16} />
-                <span>Supprimer l'utilisateur</span>
+                <span>Supprimer l&apos;utilisateur</span>
               </button>
             ) : (
               <div className="flex items-center space-x-4">

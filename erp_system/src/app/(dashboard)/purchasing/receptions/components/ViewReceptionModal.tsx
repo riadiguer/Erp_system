@@ -1,6 +1,6 @@
 'use client'
 import React from 'react'
-import { X, Eye, Package, Calendar, Building, User, MessageSquare, AlertTriangle, Truck, Check, DollarSign, Clock } from 'lucide-react'
+import { X, Eye, Package, Calendar, Building, User, MessageSquare, AlertTriangle, Truck, Check, DollarSign,  } from 'lucide-react'
 
 interface ViewReceptionModalProps {
   isOpen: boolean
@@ -49,15 +49,7 @@ export default function ViewReceptionModal({
 }: ViewReceptionModalProps) {
   if (!isOpen || !reception) return null
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString)
-    return date.toLocaleDateString('fr-FR', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    })
-  }
+
 
   const getTotalQuantiteCommandee = () => {
     return reception.produits.reduce((total, produit) => total + produit.quantiteCommandee, 0)

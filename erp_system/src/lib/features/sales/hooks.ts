@@ -28,7 +28,7 @@ export function useProduct(id?: string) {
   const key = id ? `/sales/products/${id}/` : null;
   const { data, error, mutate, isValidating } = useSWR<Product | undefined>(
     key,
-    () => SalesApi.products.get!(id!)  // If you don’t have .get, see API step below
+    () => SalesApi.products.get!(id!)  // If you don't have .get, see API step below
   );
   return { product: data, loading: !!id && !data && !error, error, refresh: mutate, isValidating };
 }
@@ -41,7 +41,7 @@ export function useOrder(id?: string) {
 
 export function useDeliveryNotesByOrder(orderId?: string) {
   const key = orderId ? `/sales/delivery-notes/?order=${orderId}` : null;
-  const { data, error, mutate } = useSWR<any[]>(key, () => SalesApi.delivery.listByOrder(orderId!));
+  const { data, error, mutate } = useSWR<DeliveryNote[]>(key, () => SalesApi.delivery.listByOrder(orderId!));
   return { deliveryNotes: data || [], loading: !!orderId && !data && !error, error, refresh: mutate };
 }
 

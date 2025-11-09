@@ -12,9 +12,9 @@ import {
   type PurchaseOrderDetail,
   type DashboardStats,
   type MaterialStatistics,
-  type StockMovementInput,
-  type MaterialInput,
-  type SupplierStatistics
+  type SupplierStatistics,
+  type StockMovementStatistics,
+  type PurchaseOrderStatistics
 } from './api';
 
 // ==================== CATEGORIES ====================
@@ -90,6 +90,20 @@ export function useSupplierMaterials(id?: number) {
     loading: !!id && !data && !error, 
     error, 
     refresh: mutate 
+  };
+}
+
+export function useSupplierStatistics() {
+  const { data, error, mutate, isValidating } = useSWR<SupplierStatistics>(
+    '/warehouse/suppliers/statistics/',
+    WarehouseApi.suppliers.getStatistics
+  );
+  return { 
+    statistics: data, 
+    loading: !data && !error, 
+    error, 
+    refresh: mutate,
+    isValidating 
   };
 }
 
@@ -197,7 +211,7 @@ export function useStockMovementsByMaterial(materialId?: number) {
 }
 
 export function useStockMovementsStatistics() {
-  const { data, error, mutate } = useSWR<any>(
+  const { data, error, mutate } = useSWR<StockMovementStatistics>(
     '/warehouse/stock-movements/statistics/',
     WarehouseApi.stockMovements.getStatistics
   );
@@ -241,7 +255,7 @@ export function usePurchaseOrder(id?: number) {
 }
 
 export function usePurchaseOrderStatistics() {
-  const { data, error, mutate } = useSWR<any>(
+  const { data, error, mutate } = useSWR<PurchaseOrderStatistics>(
     '/warehouse/purchase-orders/statistics/',
     WarehouseApi.purchaseOrders.getStatistics
   );
@@ -265,22 +279,6 @@ export function useDashboard() {
     loading: !data && !error, 
     error, 
     refresh: mutate, 
-    isValidating 
-  };
-}
-
-// Add this to your hooks.ts file, in the SUPPLIERS section:
-
-export function useSupplierStatistics() {
-  const { data, error, mutate, isValidating } = useSWR<SupplierStatistics>(
-    '/warehouse/suppliers/statistics/',
-    WarehouseApi.suppliers.getStatistics
-  );
-  return { 
-    statistics: data, 
-    loading: !data && !error, 
-    error, 
-    refresh: mutate,
     isValidating 
   };
 }

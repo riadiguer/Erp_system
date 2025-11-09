@@ -45,15 +45,7 @@ export default function ViewReturnModal({
 }: ViewReturnModalProps) {
   if (!isOpen || !retourFournisseur) return null
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString)
-    return date.toLocaleDateString('fr-FR', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    })
-  }
+
 
   const getTotalQuantiteAchetee = () => {
     return retourFournisseur.produits.reduce((total, produit) => total + produit.quantite, 0)
@@ -356,7 +348,7 @@ export default function ViewReturnModal({
                       <DollarSign className="w-6 h-6 text-white" />
                     </div>
                     <div>
-                      <h3 className="text-lg font-bold text-gray-900">Montant d'achat total</h3>
+                      <h3 className="text-lg font-bold text-gray-900">Montant d&apos;achat total</h3>
                       <p className="text-gray-600">Valeur initiale des produits</p>
                     </div>
                   </div>

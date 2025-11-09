@@ -13,6 +13,18 @@ interface SupplierFormModalProps {
   onSuccess?: () => void;  
 }
 
+interface InputGroupProps {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  name: string;
+  type?: string;
+  placeholder: string;
+  required?: boolean;
+  value: string;
+  description?: string;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+}
+
 const InputGroup = ({
   icon: Icon,
   label,
@@ -23,7 +35,7 @@ const InputGroup = ({
   value,
   description,
   onChange,
-}: any) => (
+}: InputGroupProps) => (
   <div className="group">
     <label className="block mb-2">
       <div className="flex items-center justify-between mb-1.5">
@@ -53,6 +65,21 @@ const InputGroup = ({
   </div>
 );
 
+interface SelectOption {
+  value: string;
+  label: string;
+}
+
+interface SelectGroupProps {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  name: string;
+  options: SelectOption[];
+  value: string;
+  required?: boolean;
+  onChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
+}
+
 const SelectGroup = ({
   icon: Icon,
   label,
@@ -61,7 +88,7 @@ const SelectGroup = ({
   value,
   required = false,
   onChange,
-}: any) => (
+}: SelectGroupProps) => (
   <div className="group">
     <label className="block mb-2">
       <span className="text-sm font-bold text-gray-800">
@@ -81,7 +108,7 @@ const SelectGroup = ({
         className="w-full pl-12 pr-4 py-3.5 bg-white border-2 border-gray-200 rounded-xl text-sm font-medium text-gray-900 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 focus:outline-none transition-all duration-200 hover:border-gray-300 appearance-none cursor-pointer"
       >
         <option value="">Sélectionner</option>
-        {options.map((opt: any) => (
+        {options.map((opt) => (
           <option key={opt.value} value={opt.value}>
             {opt.label}
           </option>
@@ -96,7 +123,13 @@ const SelectGroup = ({
   </div>
 );
 
-const StepIndicator = ({ number, title, active }: any) => (
+interface StepIndicatorProps {
+  number: number;
+  title: string;
+  active: boolean;
+}
+
+const StepIndicator = ({ number, title, active }: StepIndicatorProps) => (
   <div className="flex items-center space-x-3">
     <div
       className={`flex items-center justify-center w-10 h-10 rounded-full font-bold text-sm transition-all duration-300 ${
@@ -192,7 +225,7 @@ export default function SupplierFormModal({ open, onClose, supplier, onSuccess }
         nif: formData.nif || undefined,
         rc: formData.rc || undefined,
         iban: formData.iban || undefined,
-        payment_mode: (formData.payment_mode as any) || undefined,
+        payment_mode: (formData.payment_mode as Supplier['payment_mode']) || undefined,
         payment_delay: formData.payment_delay ? parseInt(formData.payment_delay) : undefined,
         notes: formData.notes || undefined,
       };
@@ -210,9 +243,10 @@ export default function SupplierFormModal({ open, onClose, supplier, onSuccess }
       // Appeler onSuccess pour rafraîchir la liste
       onSuccess?.();
       onClose();
-    } catch (error: any) {
+    } catch (error) {
       console.error("Erreur lors de la sauvegarde:", error);
-      toast.error(error?.message || "Erreur lors de la sauvegarde du fournisseur");
+      const errorMessage = error instanceof Error ? error.message : "Erreur lors de la sauvegarde du fournisseur";
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }

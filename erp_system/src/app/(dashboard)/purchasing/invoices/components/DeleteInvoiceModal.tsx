@@ -136,7 +136,7 @@ export default function DeleteInvoiceModal({
             </h3>
             <p className="text-sm text-gray-600 leading-relaxed">
               Cette action est <strong>définitive</strong> et ne peut pas être annulée. 
-              Toutes les informations financières et l'historique associés seront perdus.
+              Toutes les informations financières et l&apos;historique associés seront perdus.
             </p>
           </div>
 
@@ -283,7 +283,7 @@ export default function DeleteInvoiceModal({
             <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
               <h5 className="font-semibold text-gray-900 mb-2">Commentaires qui seront perdus :</h5>
               <p className="text-sm text-gray-700 italic bg-white p-3 rounded border-l-4 border-gray-400">
-                "{facture.commentaires}"
+                &ldquo;{facture.commentaires}&rdquo;
               </p>
             </div>
           )}
@@ -328,7 +328,7 @@ export default function DeleteInvoiceModal({
                 <h5 className="font-bold text-red-900 mb-2">Conséquences de la suppression :</h5>
                 <ul className="text-sm text-red-800 space-y-1 list-disc list-inside">
                   <li>La facture {facture.numeroFacture} sera définitivement supprimée</li>
-                  <li>L'historique des {facture.produits.length} produit{facture.produits.length > 1 ? 's' : ''} sera perdu</li>
+                  <li>L&apos;historique des {facture.produits.length} produit{facture.produits.length > 1 ? 's' : ''} sera perdu</li>
                   <li>Le montant de {facture.montantTTC.toLocaleString()} DT ne sera plus suivi</li>
                   <li>Les informations de paiement ({facture.montantPaye.toLocaleString()} DT payés) seront effacées</li>
                   {facture.montantDu > 0 && (

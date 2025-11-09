@@ -7,7 +7,6 @@ import {
   CheckCircle, 
   XCircle, 
   Calendar,
-  Filter,
   FileText,
   Trash2,
   CheckSquare,
@@ -63,8 +62,8 @@ export default function ClientInvoicesTable({
   const [filterPaid, setFilterPaid] = useState<"" | "paid" | "unpaid">("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
-  const [sortBy, setSortBy] = useState<"date" | "amount">("date");
-  const [sortDir, setSortDir] = useState<"desc" | "asc">("desc");
+  const [sortBy] = useState<"date" | "amount">("date");
+  const [sortDir] = useState<"desc" | "asc">("desc");
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [loadingBulk, setLoadingBulk] = useState(false);
@@ -155,10 +154,10 @@ export default function ClientInvoicesTable({
   const handleExportCSV = (allFiltered = true) => {
     const items = allFiltered ? filtered : current;
     onExport(items);
-    const headers = ["id", "date", "clientName", "reference", "amount", "paid", "dueDate", "note"];
+    const headers = ["id", "date", "clientName", "reference", "amount", "paid", "dueDate", "note"] as const;
     const rows = items.map((it) =>
       headers.map((h) => {
-        const v = (it as any)[h];
+        const v = it[h];
         if (v === undefined || v === null) return "";
         return String(v).replace(/"/g, '""');
       })
@@ -204,7 +203,7 @@ export default function ClientInvoicesTable({
 
           <select 
             value={filterPaid} 
-            onChange={(e) => setFilterPaid(e.target.value as any)} 
+            onChange={(e) => setFilterPaid(e.target.value as "" | "paid" | "unpaid")} 
             className="border border-gray-300 px-3 py-2 rounded-lg focus:ring-2 focus:ring-blue-500"
           >
             <option value="">Tous statuts</option>
@@ -287,7 +286,7 @@ export default function ClientInvoicesTable({
             <tr>
               <th className="px-4 py-3 text-left">
                 <button
-                  onClick={(e) => {
+                  onClick={() => {
                     const allSelected = current.every(inv => selected[inv.id]);
                     selectAllPage(!allSelected);
                   }}

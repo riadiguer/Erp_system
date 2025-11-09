@@ -1,12 +1,16 @@
 "use client";
 
 import { X, Plus, Trash2, Save, ShoppingCart, Building2, MapPin, DollarSign, Package } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
+// ⬇️ Use your existing domain type (adjust the import path if needed)
+import type { Supplier } from "@/lib/features/warehouse/types";
+
+type Currency = "DZD" | "EUR" | "USD";
 
 interface SupplierOrderModalProps {
   open: boolean;
   onClose: () => void;
-  supplier?: any;
+  supplier?: Supplier | null;
 }
 
 interface OrderLine {
@@ -14,6 +18,13 @@ interface OrderLine {
   article: string;
   quantity: number;
   price: number;
+}
+
+interface HeaderState {
+  date: string;    // yyyy-mm-dd
+  site: string;
+  delay: string;   // e.g. delivery delay / terms (kept as string for now)
+  currency: Currency;
 }
 
 export default function SupplierOrderModal({
@@ -25,7 +36,7 @@ export default function SupplierOrderModal({
     { id: 1, article: "", quantity: 1, price: 0 },
   ]);
 
-  const [header, setHeader] = useState({
+  const [header, setHeader] = useState<HeaderState>({
     date: new Date().toISOString().split("T")[0],
     site: "",
     delay: "",
@@ -33,21 +44,21 @@ export default function SupplierOrderModal({
   });
 
   const handleHeaderChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setHeader({ ...header, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setHeader((prev) => ({ ...prev, [name]: value } as HeaderState));
   };
 
-  const handleLineChange = (id: number, field: keyof OrderLine, value: any) => {
-    setLines(lines.map((l) => (l.id === id ? { ...l, [field]: value } : l)));
+  // ⬇️ Type-safe updater for any OrderLine field
+  const handleLineChange = <K extends keyof OrderLine>(id: number, field: K, value: OrderLine[K]) => {
+    setLines((prev) => prev.map((l) => (l.id === id ? { ...l, [field]: value } : l)));
   };
 
   const handleAddLine = () => {
-    setLines([...lines, { id: Date.now(), article: "", quantity: 1, price: 0 }]);
+    setLines((prev) => [...prev, { id: Date.now(), article: "", quantity: 1, price: 0 }]);
   };
 
   const handleRemoveLine = (id: number) => {
-    if (lines.length > 1) {
-      setLines(lines.filter((l) => l.id !== id));
-    }
+    setLines((prev) => (prev.length > 1 ? prev.filter((l) => l.id !== id) : prev));
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -57,10 +68,13 @@ export default function SupplierOrderModal({
     onClose();
   };
 
-  if (!open) return null;
+  const { totalAmount, totalItems } = useMemo(() => {
+    const tAmount = lines.reduce((sum, l) => sum + l.quantity * l.price, 0);
+    const tItems = lines.reduce((sum, l) => sum + l.quantity, 0);
+    return { totalAmount: tAmount, totalItems: tItems };
+  }, [lines]);
 
-  const totalAmount = lines.reduce((sum, l) => sum + l.quantity * l.price, 0);
-  const totalItems = lines.reduce((sum, l) => sum + l.quantity, 0);
+  if (!open) return null;
 
   return (
     <div className="fixed inset-0 bg-gradient-to-br from-black/70 via-purple-900/30 to-black/70 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-in fade-in duration-300">
@@ -209,7 +223,7 @@ export default function SupplierOrderModal({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {lines.map((line, index) => (
+                    {lines.map((line) => (
                       <tr key={line.id} className="group hover:bg-green-50/30 transition-colors duration-150">
                         <td className="px-4 py-3">
                           <input
@@ -224,8 +238,8 @@ export default function SupplierOrderModal({
                           <input
                             type="number"
                             value={line.quantity}
-                            onChange={(e) => handleLineChange(line.id, "quantity", Number(e.target.value))}
-                            min="1"
+                            onChange={(e) => handleLineChange(line.id, "quantity", Math.max(1, Number(e.target.value) || 0))}
+                            min={1}
                             className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-center focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none transition-all duration-200"
                           />
                         </td>
@@ -233,8 +247,8 @@ export default function SupplierOrderModal({
                           <input
                             type="number"
                             value={line.price}
-                            onChange={(e) => handleLineChange(line.id, "price", Number(e.target.value))}
-                            min="0"
+                            onChange={(e) => handleLineChange(line.id, "price", Math.max(0, Number(e.target.value) || 0))}
+                            min={0}
                             step="0.01"
                             className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium focus:border-amber-500 focus:ring-2 focus:ring-amber-100 focus:outline-none transition-all duration-200"
                           />

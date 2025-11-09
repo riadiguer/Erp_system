@@ -48,7 +48,7 @@ export default function TopClientsBarChart({
             <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
             <XAxis type="number" tick={{ fontSize: 12 }} />
             <YAxis dataKey="name" type="category" width={120} tick={{ fontSize: 12 }} />
-            <Tooltip formatter={(value: any) => `${Number(value).toLocaleString()} ${currencyLabel}`} />
+            <Tooltip formatter={(value: number | string) => `${Number(value).toLocaleString()} ${currencyLabel}`} />
             <Legend verticalAlign="top" height={20} />
             <Bar dataKey="value" name={`CA (${currencyLabel})`} fill="#06b6d4" barSize={14} />
           </BarChart>

@@ -149,6 +149,28 @@ export type MaterialStatistics = {
   }>;
 };
 
+// ✅ NEW: Types for statistics responses
+export type StockMovementStatistics = {
+  total_movements: number;
+  movements_by_type: Array<{
+    movement_type: MovementType;
+    count: number;
+    total_quantity: string;
+  }>;
+  recent_movements: StockMovement[];
+};
+
+export type PurchaseOrderStatistics = {
+  total_orders: number;
+  orders_by_status: Array<{
+    status: PurchaseOrderStatus;
+    count: number;
+    total_amount: string;
+  }>;
+  total_amount: string;
+  pending_amount: string;
+};
+
 // Input types for creating/updating
 export type MaterialInput = {
   name: string;
@@ -181,13 +203,14 @@ export type PurchaseOrderInput = {
   items?: PurchaseOrderItem[];
 };
 
+// ✅ Type for delete responses
+export type DeleteResponse = Record<string, never>;
+
 // —— HTTP helpers ——
 const get = <T>(p: string) => apiFetch<T>(p);
-const post = <T>(p: string, body?: any) => 
+const post = <T>(p: string, body?: unknown) => 
   apiFetch<T>(p, { method: 'POST', body: body ? JSON.stringify(body) : undefined });
-const put = <T>(p: string, body: any) => 
-  apiFetch<T>(p, { method: 'PUT', body: JSON.stringify(body) });
-const patch = <T>(p: string, body: any) => 
+const patch = <T>(p: string, body: unknown) => 
   apiFetch<T>(p, { method: 'PATCH', body: JSON.stringify(body) });
 const del = <T>(p: string) => 
   apiFetch<T>(p, { method: 'DELETE', body: undefined });
@@ -200,7 +223,7 @@ export const WarehouseApi = {
     get: (id: number) => get<Category>(`/warehouse/categories/${id}/`),
     create: (payload: Partial<Category>) => post<Category>('/warehouse/categories/', payload),
     update: (id: number, payload: Partial<Category>) => patch<Category>(`/warehouse/categories/${id}/`, payload),
-    remove: (id: number) => del<{}>(`/warehouse/categories/${id}/`),
+    remove: (id: number) => del<DeleteResponse>(`/warehouse/categories/${id}/`),
   },
 
   // Suppliers
@@ -211,7 +234,7 @@ export const WarehouseApi = {
     getStatistics: () => get<SupplierStatistics>('/warehouse/suppliers/statistics/'), // ✅ NEW
     create: (payload: Partial<Supplier>) => post<Supplier>('/warehouse/suppliers/', payload),
     update: (id: number, payload: Partial<Supplier>) => patch<Supplier>(`/warehouse/suppliers/${id}/`, payload),
-    remove: (id: number) => del<{}>(`/warehouse/suppliers/${id}/`),
+    remove: (id: number) => del<DeleteResponse>(`/warehouse/suppliers/${id}/`),
   },
 
   // Materials
@@ -222,7 +245,7 @@ export const WarehouseApi = {
     getStatistics: () => get<MaterialStatistics>('/warehouse/materials/statistics/'),
     create: (payload: MaterialInput) => post<Material>('/warehouse/materials/', payload),
     update: (id: number, payload: MaterialInput) => patch<Material>(`/warehouse/materials/${id}/`, payload),
-    remove: (id: number) => del<{}>(`/warehouse/materials/${id}/`),
+    remove: (id: number) => del<DeleteResponse>(`/warehouse/materials/${id}/`),
     adjustStock: (id: number, data: StockMovementInput) => 
       post<MaterialDetail>(`/warehouse/materials/${id}/adjust_stock/`, data),
   },
@@ -233,7 +256,7 @@ export const WarehouseApi = {
     get: (id: number) => get<StockMovement>(`/warehouse/stock-movements/${id}/`),
     getByMaterial: (materialId: number) => 
       get<StockMovement[]>(`/warehouse/stock-movements/by_material/?material_id=${materialId}`),
-    getStatistics: () => get<any>('/warehouse/stock-movements/statistics/'),
+    getStatistics: () => get<StockMovementStatistics>('/warehouse/stock-movements/statistics/'),
     create: (payload: StockMovementInput) => post<StockMovement>('/warehouse/stock-movements/', payload),
   },
 
@@ -241,11 +264,11 @@ export const WarehouseApi = {
   purchaseOrders: {
     list: () => get<PurchaseOrder[]>('/warehouse/purchase-orders/'),
     get: (id: number) => get<PurchaseOrderDetail>(`/warehouse/purchase-orders/${id}/`),
-    getStatistics: () => get<any>('/warehouse/purchase-orders/statistics/'),
+    getStatistics: () => get<PurchaseOrderStatistics>('/warehouse/purchase-orders/statistics/'),
     create: (payload: PurchaseOrderInput) => post<PurchaseOrderDetail>('/warehouse/purchase-orders/', payload),
     update: (id: number, payload: Partial<PurchaseOrderInput>) => 
       patch<PurchaseOrderDetail>(`/warehouse/purchase-orders/${id}/`, payload),
-    remove: (id: number) => del<{}>(`/warehouse/purchase-orders/${id}/`),
+    remove: (id: number) => del<DeleteResponse>(`/warehouse/purchase-orders/${id}/`),
     receive: (id: number, data?: { delivery_date?: string; created_by?: string }) => 
       post<PurchaseOrderDetail>(`/warehouse/purchase-orders/${id}/receive/`, data || {}),
   },

@@ -2,10 +2,28 @@
 import React, { useState } from 'react'
 import { X, Plus, Check, Building, CreditCard, Calendar, DollarSign, FileText } from 'lucide-react'
 
+interface PaymentFormData {
+  fournisseur: {
+    id: string
+    nom: string
+    email: string
+    telephone: string
+  }
+  dateEcheance: string
+  montantDu: number
+  montantPaye: number
+  statut: string
+  methodePaiement: string
+  numeroFacture: string
+  commentaires: string
+  gestionnaire: string
+  montantRestant?: number
+}
+
 interface AddPaymentModalProps {
   isOpen: boolean
   onClose: () => void
-  onSave: (formData: any) => void
+  onSave: (formData: PaymentFormData) => void
   fournisseurs: Array<{
     id: string
     nom: string
@@ -22,7 +40,7 @@ export default function AddPaymentModal({
   onSave, 
   fournisseurs 
 }: AddPaymentModalProps) {
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<PaymentFormData>({
     fournisseur: { id: '', nom: '', email: '', telephone: '' },
     dateEcheance: '',
     montantDu: 0,
@@ -78,7 +96,7 @@ export default function AddPaymentModal({
   }
 
   const handleSave = () => {
-    const calculatedData = {
+    const calculatedData: PaymentFormData = {
       ...formData,
       montantRestant: formData.montantDu - formData.montantPaye,
       statut: formData.montantPaye === 0 ? 'En attente' : 
@@ -103,7 +121,7 @@ export default function AddPaymentModal({
     }
   }
 
-  const handleFournisseurChange = (fournisseurId) => {
+  const handleFournisseurChange = (fournisseurId: string) => {
     const fournisseur = fournisseurs.find(f => f.id === fournisseurId)
     setFormData({
       ...formData,
@@ -114,7 +132,7 @@ export default function AddPaymentModal({
     }
   }
 
-  const handleMontantPayeChange = (value) => {
+  const handleMontantPayeChange = (value: string) => {
     const montantPaye = parseFloat(value) || 0
     setFormData({
       ...formData,
@@ -240,7 +258,7 @@ export default function AddPaymentModal({
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 <Calendar className="w-4 h-4 inline mr-2" />
-                Date d'échéance *
+                Date d&apos;échéance *
               </label>
               <input
                 type="date"

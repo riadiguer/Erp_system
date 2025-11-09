@@ -6,7 +6,6 @@ import {
   Briefcase,
   Tag,
   Box,
-  TrendingUp,
   DollarSign,
   AlertCircle,
   CheckCircle,
@@ -16,6 +15,36 @@ import { type Product } from "@/lib/features/sales/api";
 /* ======================================================
    🔹 Sous-composants externes pour éviter la recréation
    ====================================================== */
+
+interface FormState {
+  [key: string]: string | number | boolean;
+  name: string;
+  sku: string;
+  description: string;
+  unit: string;
+  stock_qty: string;
+  unit_price: string;
+  tax_rate: string;
+  track_stock: boolean;
+  is_active: boolean;
+}
+
+interface InputFieldProps {
+  label: string;
+  name: string;
+  type?: string;
+  icon?: React.ComponentType<{ className?: string }>;
+  required?: boolean;
+  placeholder?: string;
+  min?: number;
+  max?: number;
+  step?: string;
+  form: FormState;
+  handleChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  handleBlur: (name: string) => void;
+  errors: Record<string, string>;
+  touched: Record<string, boolean>;
+}
 
 export const InputField = ({
   label,
@@ -32,7 +61,7 @@ export const InputField = ({
   handleBlur,
   errors,
   touched,
-}: any) => {
+}: InputFieldProps) => {
   const hasError = touched[name] && errors[name];
   const isValid = touched[name] && !errors[name] && form[name];
 
@@ -51,7 +80,7 @@ export const InputField = ({
         <input
           type={type}
           name={name}
-          value={form[name]}
+          value={form[name] as string | number}
           onChange={handleChange}
           onBlur={() => handleBlur(name)}
           min={min}
@@ -88,6 +117,16 @@ export const InputField = ({
   );
 };
 
+interface SelectFieldProps {
+  label: string;
+  name: string;
+  options: string[];
+  icon?: React.ComponentType<{ className?: string }>;
+  required?: boolean;
+  form: FormState;
+  handleChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
+}
+
 export const SelectField = ({
   label,
   name,
@@ -96,7 +135,7 @@ export const SelectField = ({
   required = false,
   form,
   handleChange,
-}: any) => {
+}: SelectFieldProps) => {
   return (
     <div>
       <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -111,13 +150,13 @@ export const SelectField = ({
         )}
         <select
           name={name}
-          value={form[name]}
+          value={form[name] as string}
           onChange={handleChange}
           className={`w-full ${Icon ? "pl-10" : "pl-4"} pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-200 focus:border-indigo-500 focus:outline-none appearance-none bg-white cursor-pointer transition-all`}
           required={required}
         >
           <option value="">-- Choisir --</option>
-          {options.map((option: any) => (
+          {options.map((option) => (
             <option key={option} value={option}>
               {option}
             </option>
@@ -143,13 +182,21 @@ export const SelectField = ({
   );
 };
 
+interface TextAreaFieldProps {
+  label: string;
+  name: string;
+  placeholder?: string;
+  form: FormState;
+  handleChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
+}
+
 export const TextAreaField = ({
   label,
   name,
   placeholder = "",
   form,
   handleChange,
-}: any) => {
+}: TextAreaFieldProps) => {
   return (
     <div>
       <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -157,7 +204,7 @@ export const TextAreaField = ({
       </label>
       <textarea
         name={name}
-        value={form[name]}
+        value={form[name] as string}
         onChange={handleChange}
         rows={3}
         placeholder={placeholder}
@@ -171,7 +218,7 @@ export const TextAreaField = ({
    🔸 Composant principal ServiceForm
    ====================================================== */
 
-const initialState = {
+const initialState: FormState = {
   name: "",
   sku: "",
   description: "",
@@ -192,7 +239,7 @@ export default function ServiceForm({
   onSave: (service: Partial<Product>) => void;
   onClose: () => void;
 }) {
-  const [form, setForm] = useState(initialState);
+  const [form, setForm] = useState<FormState>(initialState);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
 

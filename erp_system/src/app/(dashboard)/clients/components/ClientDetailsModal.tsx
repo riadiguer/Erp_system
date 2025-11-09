@@ -9,16 +9,18 @@ import {
   Activity,
   CreditCard,
   Plus,
-  Download,
   Mail,
   User,
   Building2,
   DollarSign,
   Calendar,
-  ArrowLeft,
   Edit,
-  Bell
+  Phone,
+  Loader2,
+  AlertCircle,
+  Users,
 } from "lucide-react";
+import { useCustomer, useCustomerContacts, useActivateCustomer, useDeactivateCustomer } from "@/lib/features/customer/hooks";
 
 export type OrderItem = {
   id: string;
@@ -50,49 +52,41 @@ export type Activity = {
   kind?: "commande" | "paiement" | "relance" | "note";
 };
 
-export type ClientMini = {
-  revenue: number;
+export type Client = {
   id: string;
-  firstName?: string;
-  lastName?: string;
+  firstName: string;
+  lastName: string;
   email?: string;
   phone?: string;
-  type?: "Particulier" | "Société";
-  balance?: number;
-  lastOrder?: string;
-  createdAt?: string;
-  status?: "Actif" | "Inactif";
-};
-
-export type ClientFull = ClientMini & {
-  activities?: Activity[];
-  documents?: DocumentItem[];
-  orders?: OrderItem[];
-  invoices?: InvoiceItem[];
-  communications?: { id: string; date: string; channel: string; text: string }[];
+  // widen union to match ClientTable
+  type: "Particulier" | "Société" | "INDIVIDUAL" | "BUSINESS";
+  balance: number;
   revenue?: number;
+  lastOrder?: string;
+  createdAt: string;
+  status: "Actif" | "Inactif";
 };
 
 type Props = {
-  client: ClientFull | null;
+  client: Client | null;
   open: boolean;
   onClose?: () => void;
-  onEdit?: (c: ClientMini) => void;
-  onAddPayment?: (c: ClientMini) => void;
-  onNewOrder?: (c: ClientMini) => void;
-  onGenerateReport?: (c: ClientMini) => void;
-  onSendReminder?: (c: ClientMini) => void;
+  onEdit?: (c: Client) => void;
+  onAddPayment?: (c: Client) => void;
+  onNewOrder?: (c: Client) => void;
+  onGenerateReport?: (c: Client) => void;
+  onSendReminder?: (c: Client) => void;
 };
 
-const TABS = ["Overview", "Orders", "Invoices", "Documents", "Communications", "Activities"] as const;
+const TABS = ["Overview", "Contacts", "Orders", "Invoices", "Documents", "Activities"] as const;
 type Tab = (typeof TABS)[number];
 
 const TAB_ICONS = {
   Overview: Activity,
+  Contacts: Users,
   Orders: ShoppingCart,
   Invoices: FileText,
   Documents: FolderOpen,
-  Communications: MessageSquare,
   Activities: Activity,
 };
 
@@ -112,34 +106,52 @@ export default function ClientDetailsModal({
   onEdit = () => {},
   onAddPayment = () => {},
   onNewOrder = () => {},
-  onGenerateReport = () => {},
-  onSendReminder = () => {},
 }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>("Overview");
 
+  // Fetch customer data from API
+  const { data: customerData, isLoading, error } = useCustomer(
+    open && client ? Number(client.id) : null
+  );
+
+  // Fetch customer contacts
+  const { data: contactsData } = useCustomerContacts(
+    open && client ? { customer: Number(client.id) } : undefined,
+    { enabled: open && !!client }
+  );
+
+  // Activate/Deactivate mutations
+  const activateMutation = useActivateCustomer({
+    onSuccess: () => {
+      alert("Client activé avec succès!");
+    },
+  });
+
+  const deactivateMutation = useDeactivateCustomer({
+    onSuccess: () => {
+      alert("Client désactivé avec succès!");
+    },
+  });
+
   if (!open || !client) return null;
 
-  const orders: OrderItem[] = client?.orders ?? [
+  const contacts = contactsData?.results || [];
+
+  // Mock data for orders, invoices, documents, activities
+  // TODO: Replace with actual API calls when these modules are ready
+  const orders: OrderItem[] = [
     { id: "o-001", date: "2025-09-05", total: 1200, status: "Livrée" },
     { id: "o-023", date: "2025-07-11", total: 450, status: "En cours" },
   ];
 
-  const invoices: InvoiceItem[] = client?.invoices ?? [
+  const invoices: InvoiceItem[] = [
     { id: "inv-2025-08", date: "2025-08-21", amount: 120, paid: false },
     { id: "inv-2025-06", date: "2025-06-02", amount: 980, paid: true },
   ];
 
-  const documents: DocumentItem[] = client?.documents ?? [
+  const documents: DocumentItem[] = [
     { id: "d1", name: "Contrat.pdf", date: "2024-11-12", type: "Contrat" },
     { id: "d2", name: "Facture_Aug-2025.pdf", date: "2025-08-21", type: "Facture" },
-  ];
-
-  const communications = client?.communications ?? [
-    { id: "c1", date: "2025-09-01", channel: "email", text: "Relance paiement envoyée." },
-  ];
-
-  const activities: Activity[] = client?.activities ?? [
-    { id: "a1", date: "2025-08-01", note: "Relance paiement - 120 DA", amount: 120, kind: "relance" },
   ];
 
   const name = `${client.firstName ?? ""} ${client.lastName ?? ""}`.trim() || "Client";
@@ -149,7 +161,46 @@ export default function ClientDetailsModal({
   const totalOrders = orders.reduce((s, o) => s + (o.total ?? 0), 0);
   const unpaidInvoices = invoices.filter((i) => !i.paid).length;
 
-  const TabIcon = TAB_ICONS[activeTab];
+  const handleToggleStatus = () => {
+    if (!client) return;
+    
+    if (client.status === "Actif") {
+      deactivateMutation.mutate(Number(client.id));
+    } else {
+      activateMutation.mutate(Number(client.id));
+    }
+  };
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+        <div className="bg-white rounded-2xl shadow-2xl p-8 flex flex-col items-center">
+          <Loader2 className="w-12 h-12 text-blue-600 animate-spin mb-4" />
+          <p className="text-gray-600">Chargement des détails...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+        <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md">
+          <AlertCircle className="w-12 h-12 text-red-600 mx-auto mb-4" />
+          <p className="text-center text-gray-900 font-semibold mb-2">Erreur de chargement</p>
+          <p className="text-center text-gray-600 mb-4">{error.message}</p>
+          <button
+            onClick={onClose}
+            className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            Fermer
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
@@ -187,13 +238,20 @@ export default function ClientDetailsModal({
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-1">
                   <h1 className="text-2xl font-bold">{name}</h1>
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                    client.status === "Actif" 
-                      ? "bg-green-100 text-green-800 border border-green-200" 
-                      : "bg-gray-100 text-gray-700 border border-gray-200"
-                  }`}>
+                  <button
+                    onClick={handleToggleStatus}
+                    disabled={activateMutation.isPending || deactivateMutation.isPending}
+                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium cursor-pointer transition-colors ${
+                      client.status === "Actif" 
+                        ? "bg-green-100 text-green-800 border border-green-200 hover:bg-green-200" 
+                        : "bg-gray-100 text-gray-700 border border-gray-200 hover:bg-gray-200"
+                    } disabled:opacity-50 disabled:cursor-not-allowed`}
+                  >
+                    {activateMutation.isPending || deactivateMutation.isPending ? (
+                      <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                    ) : null}
                     {client.status ?? "Inconnu"}
-                  </span>
+                  </button>
                 </div>
 
                 <div className="flex items-center gap-3 text-sm text-blue-100">
@@ -210,6 +268,15 @@ export default function ClientDetailsModal({
                     <Calendar className="w-4 h-4" />
                     <span>Ajouté: {client.createdAt ?? "-"}</span>
                   </div>
+                  {customerData?.email && (
+                    <>
+                      <span>•</span>
+                      <div className="flex items-center gap-1">
+                        <Mail className="w-4 h-4" />
+                        <span>{customerData.email}</span>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
 
@@ -271,6 +338,11 @@ export default function ClientDetailsModal({
                 >
                   <Icon className="w-4 h-4" />
                   {t}
+                  {t === "Contacts" && contacts.length > 0 && (
+                    <span className="ml-1 px-1.5 py-0.5 bg-white/20 rounded-full text-xs">
+                      {contacts.length}
+                    </span>
+                  )}
                 </button>
               );
             })}
@@ -281,7 +353,15 @@ export default function ClientDetailsModal({
         <div className="flex-1 overflow-y-auto bg-gray-50 p-6">
           {activeTab === "Overview" && (
             <div className="space-y-6">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Users className="w-4 h-4 text-indigo-600" />
+                    <span className="text-xs text-gray-600">Contacts</span>
+                  </div>
+                  <div className="text-2xl font-bold text-gray-900">{contacts.length}</div>
+                </div>
+
                 <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
                   <div className="flex items-center gap-2 mb-2">
                     <ShoppingCart className="w-4 h-4 text-blue-600" />
@@ -307,26 +387,118 @@ export default function ClientDetailsModal({
                 </div>
               </div>
 
+              {/* Customer Details Card */}
               <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
                 <h4 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <MessageSquare className="w-4 h-4 text-blue-600" />
-                  Dernières communications
+                  <User className="w-4 h-4 text-blue-600" />
+                  Informations client
                 </h4>
-                {communications.length === 0 ? (
-                  <div className="text-sm text-gray-500 text-center py-4">Aucune communication récente.</div>
-                ) : (
-                  <ul className="space-y-2">
-                    {communications.map((c) => (
-                      <li key={c.id} className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
-                        <div className="text-xs text-gray-500 mb-1">
-                          {c.date} • {c.channel}
-                        </div>
-                        <div className="text-sm text-gray-700">{c.text}</div>
-                      </li>
-                    ))}
-                  </ul>
-                )}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                  {customerData?.email && (
+                    <div className="flex items-center gap-2">
+                      <Mail className="w-4 h-4 text-gray-400" />
+                      <span className="text-gray-600">Email:</span>
+                      <span className="font-medium text-gray-900">{customerData.email}</span>
+                    </div>
+                  )}
+                  {customerData?.phone && (
+                    <div className="flex items-center gap-2">
+                      <Phone className="w-4 h-4 text-gray-400" />
+                      <span className="text-gray-600">Téléphone:</span>
+                      <span className="font-medium text-gray-900">{customerData.phone}</span>
+                    </div>
+                  )}
+                  {customerData?.tax_id && (
+                    <div className="flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-gray-400" />
+                      <span className="text-gray-600">N° fiscal:</span>
+                      <span className="font-medium text-gray-900">{customerData.tax_id}</span>
+                    </div>
+                  )}
+                  {customerData?.billing_address && (
+                    <div className="flex items-start gap-2 md:col-span-2">
+                      <Building2 className="w-4 h-4 text-gray-400 mt-0.5" />
+                      <div>
+                        <span className="text-gray-600">Adresse facturation:</span>
+                        <p className="font-medium text-gray-900 whitespace-pre-line">{customerData.billing_address}</p>
+                      </div>
+                    </div>
+                  )}
+                  {customerData?.notes && (
+                    <div className="flex items-start gap-2 md:col-span-2">
+                      <MessageSquare className="w-4 h-4 text-gray-400 mt-0.5" />
+                      <div>
+                        <span className="text-gray-600">Notes:</span>
+                        <p className="font-medium text-gray-900 whitespace-pre-line">{customerData.notes}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
+            </div>
+          )}
+
+          {activeTab === "Contacts" && (
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                  <Users className="w-5 h-5 text-blue-600" />
+                  Contacts ({contacts.length})
+                </h3>
+                <button 
+                  onClick={() => alert("Ajouter contact - à implémenter")}
+                  className="inline-flex items-center px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700"
+                >
+                  <Plus className="w-4 h-4 mr-1" />
+                  Nouveau contact
+                </button>
+              </div>
+
+              {contacts.length === 0 ? (
+                <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
+                  <Users className="w-12 h-12 text-gray-400 mx-auto mb-2" />
+                  <p className="text-sm text-gray-600">Aucun contact</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {contacts.map((contact) => (
+                    <div key={contact.id} className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow">
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-white font-semibold">
+                            {contact.name.charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <div className="font-semibold text-gray-900">{contact.name}</div>
+                            {contact.role && (
+                              <div className="text-xs text-gray-500">{contact.role}</div>
+                            )}
+                          </div>
+                        </div>
+                        {contact.is_primary && (
+                          <span className="px-2 py-0.5 bg-blue-100 text-blue-800 text-xs font-medium rounded-full">
+                            Principal
+                          </span>
+                        )}
+                      </div>
+                      <div className="space-y-1 text-sm">
+                        {contact.email && (
+                          <div className="flex items-center gap-2 text-gray-600">
+                            <Mail className="w-4 h-4 flex-shrink-0" />
+                            <span className="truncate">{contact.email}</span>
+                          </div>
+                        )}
+                        {contact.phone && (
+                          <div className="flex items-center gap-2 text-gray-600">
+                            <Phone className="w-4 h-4 flex-shrink-0" />
+                            <span>{contact.phone}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
@@ -373,7 +545,7 @@ export default function ClientDetailsModal({
             </div>
           )}
 
-          {/* Autres tabs: Invoices, Documents, Communications, Activities - même structure */}
+          {/* Other tabs can be similarly implemented */}
         </div>
 
         {/* Footer */}

@@ -4,22 +4,34 @@ import {
   X, 
   CreditCard, 
   DollarSign, 
-  Calendar, 
   AlertTriangle, 
-  Check, 
   Receipt, 
-  Building, 
   Calculator,
-  Banknote,
-  Wallet,
-  FileText,
   Info
 } from 'lucide-react'
+
+interface PaymentData {
+  montantPaiement: number
+  typePaiement: string
+  dateTransaction: string
+  reference: string
+  commentaires: string
+  fraisBancaires: number
+  taux: number
+  compteDebit: string
+}
+
+interface FinalPaymentData extends PaymentData {
+  factureId: string
+  montantAvantPaiement: number
+  montantApres: number
+  nouveauStatut: string
+}
 
 interface PayInvoiceModalProps {
   isOpen: boolean
   onClose: () => void
-  onPay: (paymentData: any) => void
+  onPay: (paymentData: FinalPaymentData) => void
   facture: {
     id: string
     numeroFacture: string
@@ -45,7 +57,7 @@ export default function PayInvoiceModal({
   facture, 
   fournisseur 
 }: PayInvoiceModalProps) {
-  const [paymentData, setPaymentData] = useState({
+  const [paymentData, setPaymentData] = useState<PaymentData>({
     montantPaiement: facture?.montantDu || 0,
     typePaiement: 'virement',
     dateTransaction: new Date().toISOString().split('T')[0],
@@ -105,7 +117,7 @@ export default function PayInvoiceModal({
 
   const handlePay = () => {
     if (validateForm()) {
-      const finalPaymentData = {
+      const finalPaymentData: FinalPaymentData = {
         ...paymentData,
         factureId: facture.id,
         montantAvantPaiement: facture.montantDu,
@@ -116,15 +128,16 @@ export default function PayInvoiceModal({
     }
   }
 
-  const formatCurrency = (amount) => {
+  const formatCurrency = (amount: string | number | bigint) => {
+    const numericAmount = typeof amount === 'string' ? parseFloat(amount) : amount
     return new Intl.NumberFormat('fr-TN', {
       style: 'currency',
       currency: 'TND',
       minimumFractionDigits: 0
-    }).format(amount)
+    }).format(numericAmount as number | bigint)
   }
 
-  const formatDate = (dateString) => {
+  const formatDate = (dateString: string | number | Date) => {
     return new Date(dateString).toLocaleDateString('fr-FR', {
       year: 'numeric',
       month: 'long',
@@ -136,20 +149,10 @@ export default function PayInvoiceModal({
   const isOverpayment = paymentData.montantPaiement > facture.montantDu
   const isFullPayment = paymentData.montantPaiement === facture.montantDu
 
-  const getPaymentTypeIcon = (type) => {
-    switch (type) {
-      case 'virement': return <Banknote className="w-4 h-4" />
-      case 'cheque': return <FileText className="w-4 h-4" />
-      case 'especes': return <Wallet className="w-4 h-4" />
-      case 'carte': return <CreditCard className="w-4 h-4" />
-      default: return <DollarSign className="w-4 h-4" />
-    }
-  }
-
   const calculerDelaiRetard = () => {
     const aujourdhui = new Date()
     const echeance = new Date(facture.dateEcheance)
-    const diffTime = aujourdhui - echeance
+    const diffTime = aujourdhui.getTime() - echeance.getTime()
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
     return diffDays > 0 ? diffDays : 0
   }

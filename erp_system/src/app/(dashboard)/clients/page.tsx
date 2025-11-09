@@ -1,36 +1,34 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useCallback } from "react";
 import { 
   Users, 
   Plus, 
-  Search, 
   TrendingUp,
   AlertTriangle,
   DollarSign,
   UserCheck,
-  Download,
-  Filter
 } from "lucide-react";
 import TopBar from "./components/TopBar";
 import ClientTable from "./components/ClientTable";
 import ClientFormModal from "./components/ClientFormModal";
-import ClientDetailsPanel from "./components/ClientDetailsModal";
-import QuickActions from "./components/QuickActions";
-
+import ClientDetailsModal from "./components/ClientDetailsModal";
 import ClientSalesEvolution from "./components/Charts/ClientSalesEvolution";
 import ClientsPieChart from "./components/Charts/ClientsPieChart";
-import TopClientsBarChart from "./components/Charts/TopClientsBarChart";
-import ClientDetailsModal from "./components/ClientDetailsModal";
-import { useCallback } from "react";
+import { useCustomers, useDeleteCustomer } from "@/lib/features/customer/hooks";
+import { customerKeys } from "@/lib/features/customer/hooks";
+import type { Customer } from "@/lib/features/customer/api";
+import { useQueryClient } from "@tanstack/react-query";
 
+// Map backend Customer to your Client type
 export type Client = {
   id: string;
   firstName: string;
   lastName: string;
   email?: string;
   phone?: string;
-  type: "Particulier" | "Société";
+  // widen union to match ClientTable
+  type: "Particulier" | "Société" | "INDIVIDUAL" | "BUSINESS";
   balance: number;
   revenue?: number;
   lastOrder?: string;
@@ -38,47 +36,32 @@ export type Client = {
   status: "Actif" | "Inactif";
 };
 
-const MOCK_CLIENTS: Client[] = [
-  {
-    id: "c1",
-    firstName: "Amine",
-    lastName: "Bendjeb",
-    email: "amine@example.com",
-    phone: "+213661234567",
-    type: "Particulier",
-    balance: -120.5,
-    revenue: 9800,
-    lastOrder: "2025-09-05",
-    createdAt: "2024-11-10",
-    status: "Actif",
-  },
-  {
-    id: "c2",
-    firstName: "TechPlus",
-    lastName: "SARL",
-    email: "contact@techplus.dz",
-    phone: "+213670000111",
-    type: "Société",
-    balance: 3200,
-    revenue: 31200,
-    lastOrder: "2025-08-20",
-    createdAt: "2023-05-01",
-    status: "Actif",
-  },
-  {
-    id: "c3",
-    firstName: "Sara",
-    lastName: "Benali",
-    email: "sara@example.com",
-    phone: "+213661112223",
-    type: "Particulier",
-    balance: 450,
-    revenue: 4200,
-    lastOrder: "2025-07-11",
-    createdAt: "2024-12-02",
-    status: "Actif",
-  },
-];
+function mapCustomerToClient(customer: Customer): Client {
+  // Map backend type to frontend type
+  let clientType: Client["type"];
+  if (customer.type === "BUSINESS") {
+    clientType = "Société";
+  } else if (customer.type === "INDIVIDUAL") {
+    clientType = "Particulier";
+  } else {
+    // Fallback for any unexpected values
+    clientType = "Particulier";
+  }
+
+  return {
+    id: String(customer.id),
+    firstName: customer.name.split(" ")[0] || "",
+    lastName: customer.name.split(" ").slice(1).join(" ") || "",
+    email: customer.email,
+    phone: customer.phone,
+    type: clientType,
+    balance: parseFloat(customer.balance) || 0, // ✅ FIXED: Use actual balance from API
+    revenue: 0, // Backend doesn't have revenue - needs separate calculation
+    lastOrder: undefined,
+    createdAt: customer.created_at.slice(0, 10),
+    status: customer.is_active ? "Actif" : "Inactif",
+  };
+}
 
 function monthKeyFromDate(d: string) {
   if (!d) return "";
@@ -99,6 +82,16 @@ function getMonthRange(startISO: string, endISO: string) {
   return months;
 }
 
+type StatCardProps = {
+  icon: React.ReactElement<{ className?: string }>;
+  title: string;
+  value: React.ReactNode;
+  subtitle?: string;
+  trend?: string;
+  bgColor: string;
+  iconColor: string;
+};
+
 const StatCard = ({
   icon,
   title,
@@ -107,15 +100,7 @@ const StatCard = ({
   trend,
   bgColor,
   iconColor,
-}: {
-  icon: React.ReactElement<any>;
-  title: string;
-  value: React.ReactNode;
-  subtitle?: string;
-  trend?: string;
-  bgColor: string;
-  iconColor: string;
-}) => (
+}: StatCardProps) => (
   <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
     <div className="flex items-center justify-between">
       <div>
@@ -139,11 +124,39 @@ const StatCard = ({
 );
 
 export default function ClientsPage() {
-  const [clients, setClients] = useState<Client[]>(MOCK_CLIENTS);
   const [query, setQuery] = useState("");
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
+
+  // Fetch customers from API
+  const { data: customersData, isLoading, error } = useCustomers({
+    search: query,
+    is_active: undefined, // Show all by default
+  });
+
+  const queryClient = useQueryClient();
+
+  // Delete customer mutation
+  const deleteCustomerMutation = useDeleteCustomer({
+    onSuccess: () => {
+      // Invalidate and refetch the customers list
+      queryClient.invalidateQueries({ queryKey: customerKeys.lists() });
+      
+      if (selectedClient) {
+        setSelectedClient(null);
+      }
+    },
+    onError: (error) => {
+      alert(`Erreur lors de la suppression: ${error.message}`);
+    }
+  });
+
+  // Map backend customers to frontend Client type
+  const clients = useMemo(() => {
+    if (!customersData?.results) return [];
+    return customersData.results.map(mapCustomerToClient);
+  }, [customersData]);
 
   const openNewClient = useCallback(() => {
     setEditingClient(null);
@@ -159,29 +172,14 @@ export default function ClientsPage() {
     setIsFormOpen(false);
   }, []);
 
-  const saveClient = useCallback((payload: Client) => {
-    const client: Client = {
-      ...payload,
-      type: payload.type ?? "Particulier",
-    };
-    setClients((prev) => {
-      const exists = prev.find((p) => p.id === client.id);
-      if (exists) return prev.map((p) => (p.id === client.id ? client : p));
-      return [client, ...prev];
-    });
-    setIsFormOpen(false);
-  }, []);
+  const deleteClient = useCallback((id: string) => {
+    if (confirm("Êtes-vous sûr de vouloir supprimer ce client ?")) {
+      deleteCustomerMutation.mutate(Number(id));
+    }
+  }, [deleteCustomerMutation]);
 
-
-  const deleteClient = (id: string) => {
-    setClients((prev) => prev.filter((p) => p.id !== id));
-    if (selectedClient?.id === id) setSelectedClient(null);
-  };
-
-  const filtered = clients.filter((c) => {
-    const full = `${c.firstName} ${c.lastName} ${c.email ?? ""} ${c.phone ?? ""}`.toLowerCase();
-    return full.includes(query.toLowerCase());
-  });
+  // Filter clients based on search query (now handled by API)
+  const filtered = clients;
 
   // Statistics
   const stats = useMemo(() => {
@@ -189,8 +187,12 @@ export default function ClientsPage() {
     const activeClients = clients.filter(c => c.status === "Actif").length;
     const totalRevenue = clients.reduce((sum, c) => sum + (c.revenue || 0), 0);
     const negativeBalance = clients.filter(c => c.balance < 0).length;
+    // ✅ Calculate total outstanding debt (sum of negative balances)
+    const totalDebt = clients
+      .filter(c => c.balance < 0)
+      .reduce((sum, c) => sum + Math.abs(c.balance), 0);
     
-    return { totalClients, activeClients, totalRevenue, negativeBalance };
+    return { totalClients, activeClients, totalRevenue, negativeBalance, totalDebt };
   }, [clients]);
 
   // Charts data
@@ -200,12 +202,6 @@ export default function ClientsPage() {
       map.set(c.type, (map.get(c.type) ?? 0) + 1);
     }
     return Array.from(map.entries()).map(([name, value]) => ({ name, value }));
-  }, [clients]);
-
-  const topClientsByCA = useMemo(() => {
-    return [...clients]
-      .map((c) => ({ name: `${c.firstName} ${c.lastName}`, value: c.revenue ?? Math.abs(c.balance ?? 0) }))
-      .sort((a, b) => b.value - a.value);
   }, [clients]);
 
   const salesEvolution = useMemo(() => {
@@ -222,6 +218,31 @@ export default function ClientsPage() {
     }
     return months.map((m) => ({ date: m, value: Math.round((agg.get(m) ?? 0) * 100) / 100 }));
   }, [clients]);
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Chargement des clients...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
+        <div className="text-center">
+          <AlertTriangle className="w-12 h-12 text-red-600 mx-auto mb-4" />
+          <p className="text-gray-900 font-semibold mb-2">Erreur de chargement</p>
+          <p className="text-gray-600">{error.message}</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
@@ -271,7 +292,7 @@ export default function ClientsPage() {
             icon={<UserCheck />}
             title="Clients actifs"
             value={stats.activeClients}
-            subtitle={`${Math.round((stats.activeClients / stats.totalClients) * 100)}% du total`}
+            subtitle={`${Math.round((stats.activeClients / stats.totalClients) * 100) || 0}% du total`}
             bgColor="bg-green-100"
             iconColor="text-green-600"
           />
@@ -290,7 +311,7 @@ export default function ClientsPage() {
             icon={<AlertTriangle />}
             title="Impayés"
             value={stats.negativeBalance}
-            subtitle="Clients en négatif"
+            subtitle={`${stats.totalDebt.toLocaleString()} DA à recouvrer`}
             bgColor="bg-red-100"
             iconColor="text-red-600"
           />
@@ -304,8 +325,8 @@ export default function ClientsPage() {
         />
 
         {/* Main Content Grid */}
-        <div className="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-6">
+        <div className="mt-6 grid grid-cols-1 gap-6">
+          <div className="space-y-6">
             {/* Client Table */}
             <section className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
               <div className="flex items-center justify-between mb-4">
@@ -320,21 +341,7 @@ export default function ClientsPage() {
               </div>
               <ClientTable
                 clients={filtered}
-                onView={(c) =>
-                  setSelectedClient({
-                    id: c.id,
-                    firstName: c.firstName ?? "",
-                    lastName: c.lastName ?? "",
-                    email: c.email ?? "",
-                    phone: c.phone ?? "",
-                    type: c.type ?? "Particulier",
-                    balance: c.balance ?? 0,
-                    revenue: c.revenue ?? 0,
-                    lastOrder: c.lastOrder ?? "",
-                    createdAt: c.createdAt ?? "",
-                    status: c.status ?? "Actif",
-                  })
-                }
+                onView={(c) => setSelectedClient(c)}
                 onEdit={openEditClient}
                 onDelete={(id) => deleteClient(id)}
               />
@@ -352,22 +359,10 @@ export default function ClientsPage() {
                   <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
                     <ClientsPieChart data={clientsByType} />
                   </div>
-                  
                 </div>
               </div>
             </section>
           </div>
-
-          {/* Sidebar */}
-          <aside className="space-y-6">
-            <QuickActions
-              onAddClient={openNewClient}
-              onNewOrder={() => alert("Créer commande – à implémenter")}
-              onAddPayment={() => alert("Ajouter paiement – à implémenter")}
-              onGenerateReport={() => alert("Générer rapport – à implémenter")}
-              onSendReminder={() => alert("Envoyer rappel – à implémenter")}
-            />
-          </aside>
         </div>
       </div>
 
@@ -375,44 +370,21 @@ export default function ClientsPage() {
       <ClientFormModal 
         open={isFormOpen} 
         initialData={editingClient} 
-        onClose={closeForm} 
-        onSave={saveClient} 
+        onClose={closeForm}
       />
-
 
       <ClientDetailsModal
         open={!!selectedClient}
-        client={
-          selectedClient
-            ? {
-                ...selectedClient,
-                revenue: selectedClient.revenue ?? 0,
-              }
-            : null
-        }
+        client={selectedClient}
         onClose={() => setSelectedClient(null)}
         onEdit={(c) => {
           setSelectedClient(null);
-          // Convert ClientMini to Client if needed
-          const client: Client = {
-            id: c.id,
-            firstName: c.firstName ?? "",
-            lastName: c.lastName ?? "",
-            email: c.email ?? "",
-            phone: c.phone ?? "",
-            type: c.type ?? "Particulier",
-            balance: c.balance ?? 0,
-            revenue: c.revenue ?? 0,
-            lastOrder: c.lastOrder ?? "",
-            createdAt: c.createdAt ?? "",
-            status: c.status ?? "Actif",
-          };
-          openEditClient(client);
+          openEditClient(c);
         }}
-        onAddPayment={(c) => alert("Ajouter paiement — à implémenter")}
-        onNewOrder={(c) => alert("Créer commande — à implémenter")}
-        onGenerateReport={(c) => alert("Générer rapport — à implémenter")}
-        onSendReminder={(c) => alert("Envoyer rappel — à implémenter")}
+        onAddPayment={() => alert("Ajouter paiement – à implémenter")}
+        onNewOrder={() => alert("Créer commande – à implémenter")}
+        onGenerateReport={() => alert("Générer rapport – à implémenter")}
+        onSendReminder={() => alert("Envoyer rappel – à implémenter")}
       />
     </div>
   );

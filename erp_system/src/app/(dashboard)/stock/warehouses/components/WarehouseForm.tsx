@@ -4,13 +4,9 @@ import {
   X,
   Save,
   Package,
-  Tag,
-  Box,
   TrendingUp,
-  Truck,
   DollarSign,
   AlertCircle,
-  CheckCircle,
 } from "lucide-react";
 import { useCategories, useSuppliers } from "@/lib/features/warehouse/hooks";
 
@@ -27,6 +23,18 @@ type MaterialForm = {
   price: string;
 };
 
+// Type for the material prop
+type Material = {
+  name?: string;
+  reference?: string;
+  category?: Id | { id: Id; name: string };
+  stock?: number;
+  min_stock?: number;
+  unit?: string;
+  supplier?: Id | { id: Id; name: string };
+  price?: number;
+};
+
 const initialState: MaterialForm = {
   name: "",
   reference: "",
@@ -39,8 +47,8 @@ const initialState: MaterialForm = {
 };
 
 type Props = {
-  material?: any;
-  onSave: (payload: Record<string, any>) => void;
+  material?: Material;
+  onSave: (payload: Record<string, string | number | undefined>) => void;
   onClose: () => void;
 };
 
@@ -49,8 +57,8 @@ export default function WarehouseForm({ material, onSave, onClose }: Props) {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
 
-  const { categories: apiCategories, loading: loadingCategories } = useCategories();
-  const { suppliers: apiSuppliers, loading: loadingSuppliers } = useSuppliers();
+  const { categories: apiCategories } = useCategories();
+  const { suppliers: apiSuppliers } = useSuppliers();
 
   const units = ["mètre", "rouleau", "litre", "kg", "pièce", "boîte"];
 
@@ -78,7 +86,7 @@ export default function WarehouseForm({ material, onSave, onClose }: Props) {
     const { name, value } = e.target;
     const finalValue =
       (name === "category" || name === "supplier") && value === "" ? undefined : value;
-    setForm((prev) => ({ ...prev, [name]: finalValue as any }));
+    setForm((prev) => ({ ...prev, [name]: finalValue }));
     if (errors[name]) setErrors((prev) => ({ ...prev, [name]: "" }));
   };
 
@@ -147,7 +155,7 @@ export default function WarehouseForm({ material, onSave, onClose }: Props) {
     setTouched(allTouched);
     if (!validateForm()) return;
 
-    const payload = {
+    const payload: Record<string, string | number | undefined> = {
       ...form,
       stock: Number(form.stock),
       min_stock: Number(form.min_stock),
@@ -157,8 +165,9 @@ export default function WarehouseForm({ material, onSave, onClose }: Props) {
     };
 
     Object.keys(payload).forEach((key) => {
-      if (payload[key] === undefined || payload[key] === "" || Number.isNaN(payload[key])) {
-        delete payload[key];
+      const k = key as keyof typeof payload;
+      if (payload[k] === undefined || payload[k] === "" || Number.isNaN(payload[k])) {
+        delete payload[k];
       }
     });
 

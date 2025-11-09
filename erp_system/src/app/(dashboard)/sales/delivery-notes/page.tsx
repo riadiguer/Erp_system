@@ -6,47 +6,7 @@ import { PermissionGate } from '@/components/guards/PermissionGate';
 import { SalesApi } from '@/lib/features/sales/api';
 import { useDeliveryNotes, useOrder, useOrders } from '@/lib/features/sales/hooks';
 
-// ---- Types ----------------------------------------------
-type DeliveryNoteStatus = 'DRAFT' | 'SENT' | 'DELIVERED' | 'CANCELLED';
 
-type ProductLite = { 
-  id: string; 
-  sku: string; 
-  name: string; 
-};
-
-type OrderLineLite = {
-  id: string;
-  product: string;
-  product_detail?: ProductLite;
-  description?: string;
-  quantity: string;
-  delivered_qty: string;
-};
-
-type OrderLite = {
-  id: string;
-  code: string;
-  customer_detail?: { name: string };
-  currency: string;
-  lines: OrderLineLite[];
-};
-
-type DeliveryLine = { 
-  id: string; 
-  order_line: string; 
-  quantity: string; 
-};
-
-type DeliveryNote = {
-  id: string;
-  code: string;
-  status: DeliveryNoteStatus;
-  created_at: string;
-  order: string;
-  order_detail?: OrderLite;
-  lines: DeliveryLine[];
-};
 
 // ---- UI ---------------------------------------------------------------------
 export default function DeliveryNotesPage() {
@@ -129,7 +89,7 @@ export default function DeliveryNotesPage() {
     
     // Build lines array only for selected items with quantity > 0
     const lines = Object.entries(quantities)
-      .filter(([_, qty]) => qty > 0)
+      .filter(([, qty]) => qty > 0)
       .map(([lineId, qty]) => ({
         order_line: lineId,
         quantity: qty
@@ -169,28 +129,31 @@ export default function DeliveryNotesPage() {
       setQuantities({});
       await refresh();
       router.push(`/sales/delivery-notes/${dn.id}`);
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error('Delivery note creation failed:', e);
       
       let errorMsg = 'Failed to create delivery note.';
       
-      if (e?.response) {
+      if (e && typeof e === 'object' && 'response' in e) {
+        const errorWithResponse = e as { response: Response };
         try {
-          const data = await e.response.json();
+          const data = await errorWithResponse.response.json();
           console.log('API error response:', data);
           errorMsg = data?.lines?.[0] || data?.detail || data?.error || data?.message || JSON.stringify(data);
-        } catch (jsonErr) {
+        } catch {
           try {
-            const text = await e.response.text();
+            const text = await errorWithResponse.response.text();
             errorMsg = text || errorMsg;
-          } catch (textErr) {
-            // Ignore
+          } catch {
+            // Ignore - keep default errorMsg
           }
         }
-      } else if (e?.detail) {
-        errorMsg = typeof e.detail === 'string' ? e.detail : JSON.stringify(e.detail);
-      } else if (e?.message) {
-        errorMsg = e.message;
+      } else if (e && typeof e === 'object' && 'detail' in e) {
+        const errorWithDetail = e as { detail: unknown };
+        errorMsg = typeof errorWithDetail.detail === 'string' ? errorWithDetail.detail : JSON.stringify(errorWithDetail.detail);
+      } else if (e && typeof e === 'object' && 'message' in e) {
+        const errorWithMessage = e as { message: string };
+        errorMsg = errorWithMessage.message;
       } else if (typeof e === 'string') {
         errorMsg = e;
       }

@@ -1,11 +1,44 @@
 'use client'
 import React, { useState } from 'react'
-import { X, Plus, Check, Package, Calendar, Building, User, Truck, AlertTriangle } from 'lucide-react'
+import { X, Plus, Check, Package, Truck } from 'lucide-react'
+
+// Interface pour les produits
+interface Produit {
+  id: string
+  nom: string
+  quantiteCommandee: number
+  quantiteRecue: number
+  etat: string
+  prixUnitaire: number
+  commentaire: string
+}
+
+// Interface pour le formulaire de réception
+interface ReceptionFormData {
+  bonCommande: {
+    id: string
+    numeroBon: string
+    fournisseur: {
+      id: string
+      nom: string
+      email: string
+    }
+  }
+  dateReception: string
+  heureReception: string
+  receptionnePar: string
+  numeroBonLivraison: string
+  transporteur: string
+  etatLivraison: string
+  produits: Produit[]
+  commentairesReception: string
+  montantTotal: number
+}
 
 interface AddReceptionModalProps {
   isOpen: boolean
   onClose: () => void
-  onSave: (formData: any) => void
+  onSave: (formData: ReceptionFormData) => void
   fournisseursDispo: Array<{
     id: string
     nom: string
@@ -27,7 +60,7 @@ export default function AddReceptionModal({
   fournisseursDispo, 
   bonsCommandeDispo 
 }: AddReceptionModalProps) {
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<ReceptionFormData>({
     bonCommande: { id: '', numeroBon: '', fournisseur: { id: '', nom: '', email: '' } },
     dateReception: new Date().toISOString().split('T')[0],
     heureReception: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
@@ -35,15 +68,7 @@ export default function AddReceptionModal({
     numeroBonLivraison: '',
     transporteur: '',
     etatLivraison: 'Conforme',
-    produits: [] as Array<{
-      id: string
-      nom: string
-      quantiteCommandee: number
-      quantiteRecue: number
-      etat: string
-      prixUnitaire: number
-      commentaire: string
-    }>,
+    produits: [],
     commentairesReception: '',
     montantTotal: 0
   })
@@ -99,7 +124,7 @@ export default function AddReceptionModal({
     }
   }
 
-  const handleBonCommandeChange = (bonId) => {
+  const handleBonCommandeChange = (bonId: string) => {
     const bon = bonsCommandeDispo.find(b => b.id === bonId)
     if (bon) {
       const fournisseur = fournisseursDispo.find(f => f.nom === bon.fournisseur)
@@ -120,9 +145,9 @@ export default function AddReceptionModal({
     }
   }
 
-  const generateProduitsForBon = (bon) => {
+  const generateProduitsForBon = (bon: typeof bonsCommandeDispo[0]): Produit[] => {
     // Simulation de produits basée sur le bon de commande
-    const produitsSimules = {
+    const produitsSimules: Record<string, Produit[]> = {
       'BC001': [
         { id: 'P001', nom: 'Ordinateur portable Dell', quantiteCommandee: 2, quantiteRecue: 2, etat: 'Conforme', prixUnitaire: 2500, commentaire: '' },
         { id: 'M001', nom: 'Câbles réseau Cat6', quantiteCommandee: 10, quantiteRecue: 10, etat: 'Conforme', prixUnitaire: 15, commentaire: '' }
@@ -138,7 +163,7 @@ export default function AddReceptionModal({
     return produitsSimules[bon.id] || []
   }
 
-  const updateProduitRecu = (produitId, field, value) => {
+  const updateProduitRecu = (produitId: string, field: keyof Produit, value: string | number) => {
     setFormData({
       ...formData,
       produits: formData.produits.map(p => 

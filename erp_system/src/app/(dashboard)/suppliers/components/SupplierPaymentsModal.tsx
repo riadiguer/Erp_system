@@ -2,11 +2,27 @@
 
 import { X, CreditCard, Calendar, DollarSign, FileText, Save, CheckCircle } from "lucide-react";
 import { useState } from "react";
+// ⬇️ Use your domain type (adjust path if needed)
+import type { Supplier } from "@/lib/features/warehouse/types";
+
+type PaymentMode = "bank" | "cash" | "check" | "credit";
+
+type SupplierWithBalance = Supplier & {
+  balance?: number | null; // optional if not always provided
+};
 
 interface SupplierPaymentsModalProps {
   open: boolean;
   onClose: () => void;
-  supplier?: any;
+  supplier?: SupplierWithBalance | null;
+}
+
+interface PaymentFormData {
+  date: string;           // yyyy-mm-dd
+  amount: string;         // keep as string for controlled input
+  mode: PaymentMode | ""; // "" when nothing selected
+  reference: string;
+  note: string;
 }
 
 export default function SupplierPaymentsModal({
@@ -14,7 +30,7 @@ export default function SupplierPaymentsModal({
   onClose,
   supplier,
 }: SupplierPaymentsModalProps) {
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<PaymentFormData>({
     date: new Date().toISOString().split("T")[0],
     amount: "",
     mode: "",
@@ -22,8 +38,11 @@ export default function SupplierPaymentsModal({
     note: "",
   });
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
+  ) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -34,12 +53,14 @@ export default function SupplierPaymentsModal({
 
   if (!open) return null;
 
-  const paymentModes = [
+  const paymentModes: Array<{ value: PaymentMode; label: string; icon: string }> = [
     { value: "bank", label: "Virement bancaire", icon: "🏦" },
     { value: "cash", label: "Espèces", icon: "💵" },
     { value: "check", label: "Chèque", icon: "📝" },
     { value: "credit", label: "Crédit", icon: "💳" },
   ];
+
+  const supplierBalance = typeof supplier?.balance === "number" ? supplier.balance : undefined;
 
   return (
     <div className="fixed inset-0 bg-gradient-to-br from-black/70 via-green-900/30 to-black/70 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-in fade-in duration-300">
@@ -78,7 +99,7 @@ export default function SupplierPaymentsModal({
         </div>
 
         {/* Balance Info */}
-        {supplier?.balance && (
+        {typeof supplierBalance === "number" && (
           <div className="px-8 py-4 bg-gradient-to-r from-amber-50 to-orange-50 border-b border-amber-200">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
@@ -88,14 +109,14 @@ export default function SupplierPaymentsModal({
                 <div>
                   <p className="text-xs font-medium text-amber-700">Solde actuel</p>
                   <p className="text-xl font-bold text-amber-900">
-                    {supplier.balance.toLocaleString()} DA
+                    {supplierBalance.toLocaleString()} DA
                   </p>
                 </div>
               </div>
               <div className="text-right">
                 <p className="text-xs font-medium text-amber-700">Après paiement</p>
                 <p className="text-xl font-bold text-green-700">
-                  {(supplier.balance - (Number(formData.amount) || 0)).toLocaleString()} DA
+                  {(supplierBalance - (Number(formData.amount) || 0)).toLocaleString()} DA
                 </p>
               </div>
             </div>
@@ -140,7 +161,7 @@ export default function SupplierPaymentsModal({
                     onChange={handleChange}
                     placeholder="ex: 150000"
                     required
-                    min="0"
+                    min={0}
                     step="0.01"
                     className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl text-sm font-medium text-gray-900 placeholder:text-gray-400 focus:border-green-500 focus:ring-4 focus:ring-green-100 focus:outline-none transition-all duration-200"
                   />
@@ -162,7 +183,7 @@ export default function SupplierPaymentsModal({
                   <button
                     key={mode.value}
                     type="button"
-                    onClick={() => setFormData({ ...formData, mode: mode.value })}
+                    onClick={() => setFormData((prev) => ({ ...prev, mode: mode.value }))}
                     className={`relative p-4 rounded-xl border-2 transition-all duration-200 hover:scale-105 ${
                       formData.mode === mode.value
                         ? "border-purple-500 bg-purple-50 shadow-lg"
@@ -176,9 +197,11 @@ export default function SupplierPaymentsModal({
                     )}
                     <div className="text-center">
                       <div className="text-2xl mb-2">{mode.icon}</div>
-                      <p className={`text-xs font-semibold ${
-                        formData.mode === mode.value ? "text-purple-900" : "text-gray-700"
-                      }`}>
+                      <p
+                        className={`text-xs font-semibold ${
+                          formData.mode === mode.value ? "text-purple-900" : "text-gray-700"
+                        }`}
+                      >
                         {mode.label}
                       </p>
                     </div>
@@ -222,7 +245,6 @@ export default function SupplierPaymentsModal({
                 className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl text-sm font-medium text-gray-900 placeholder:text-gray-400 focus:border-gray-500 focus:ring-4 focus:ring-gray-100 focus:outline-none transition-all duration-200 resize-none"
               />
             </div>
-
           </div>
         </form>
 

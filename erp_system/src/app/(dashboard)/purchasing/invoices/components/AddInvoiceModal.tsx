@@ -1,26 +1,55 @@
 'use client'
 import React, { useState, useEffect } from 'react'
-import { X, Plus, Check, Building, Receipt, Calendar, DollarSign, Package, AlertTriangle, FileText } from 'lucide-react'
+import { X, Plus, Check, Building, Receipt, DollarSign, Package, AlertTriangle, FileText } from 'lucide-react'
+
+interface Fournisseur {
+  id: string
+  nom: string
+  email: string
+  telephone: string
+  adresse: string
+  statut: string
+}
+
+interface Produit {
+  id: string
+  nom: string
+  quantite: number
+  prixUnitaire: number
+  montantTotal: number
+}
+
+interface FormData {
+  fournisseurId: string
+  numeroFacture: string
+  dateFacture: string
+  dateEcheance: string
+  type: string
+  statut: string
+  montantHT: number
+  tauxTVA: number
+  montantTTC: number
+  montantPaye: number
+  montantDu: number
+  produits: Produit[]
+  commentaires: string
+  referenceCommande: string
+  modePaiement: string
+  delaiPaiement: number
+}
 
 interface AddInvoiceModalProps {
   isOpen: boolean
   onClose: () => void
-  onSave: (formData: any) => void
+  onSave: (formData: FormData) => void
   fournisseur?: {
     id: string
     nom: string
     email: string
     telephone: string
     adresse: string
-  }
-  fournisseurs: Array<{
-    id: string
-    nom: string
-    email: string
-    telephone: string
-    adresse: string
-    statut: string
-  }>
+  } | null
+  fournisseurs: Fournisseur[]
 }
 
 export default function AddInvoiceModal({ 
@@ -30,7 +59,7 @@ export default function AddInvoiceModal({
   fournisseur,
   fournisseurs 
 }: AddInvoiceModalProps) {
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<FormData>({
     fournisseurId: '',
     numeroFacture: '',
     dateFacture: new Date().toISOString().split('T')[0],
@@ -42,13 +71,7 @@ export default function AddInvoiceModal({
     montantTTC: 0,
     montantPaye: 0,
     montantDu: 0,
-    produits: [] as Array<{
-      id: string
-      nom: string
-      quantite: number
-      prixUnitaire: number
-      montantTotal: number
-    }>,
+    produits: [],
     commentaires: '',
     referenceCommande: '',
     modePaiement: 'Virement',
@@ -63,7 +86,13 @@ export default function AddInvoiceModal({
     produits: ''
   })
 
-  const [selectedFournisseur, setSelectedFournisseur] = useState(null)
+  const [selectedFournisseur, setSelectedFournisseur] = useState<{
+    id: string
+    nom: string
+    email: string
+    telephone: string
+    adresse: string
+  } | null>(null)
 
   // Produits disponibles pour la facture
   const [produitsDisponibles] = useState([
@@ -74,7 +103,7 @@ export default function AddInvoiceModal({
     { id: 'P005', nom: 'Souris optique', type: 'produit', prixDefaut: 25 },
     { id: 'M001', nom: 'Câbles réseau Cat6', type: 'matiere', prixDefaut: 15 },
     { id: 'M002', nom: 'Papier A4', type: 'matiere', prixDefaut: 8 },
-    { id: 'M003', nom: 'Cartouches d\'encre', type: 'matiere', prixDefaut: 45 },
+    { id: 'M003', nom: "Cartouches d'encre", type: 'matiere', prixDefaut: 45 },
     { id: 'M004', nom: 'Toner pour imprimante', type: 'matiere', prixDefaut: 120 },
     { id: 'M005', nom: 'Stylos à bille', type: 'matiere', prixDefaut: 1.5 }
   ])
@@ -107,7 +136,7 @@ export default function AddInvoiceModal({
         numeroFacture: numeroAuto
       }))
     }
-  }, [isOpen, formData.type])
+  }, [isOpen, formData.type, formData.numeroFacture])
 
   // Calculer automatiquement les montants
   useEffect(() => {
@@ -156,11 +185,10 @@ export default function AddInvoiceModal({
     }
 
     if (!formData.dateEcheance) {
-      newErrors.dateEcheance = 'La date d\'échéance est requise'
+      newErrors.dateEcheance = "La date d'échéance est requise"
     } else {
-      const today = new Date().toISOString().split('T')[0]
       if (formData.dateEcheance < formData.dateFacture) {
-        newErrors.dateEcheance = 'La date d\'échéance doit être après la date de facture'
+        newErrors.dateEcheance = "La date d'échéance doit être après la date de facture"
       }
     }
 
@@ -207,7 +235,7 @@ export default function AddInvoiceModal({
     onClose()
   }
 
-  const handleFournisseurChange = (fournisseurId) => {
+  const handleFournisseurChange = (fournisseurId: string) => {
     const fournisseur = fournisseurs.find(f => f.id === fournisseurId)
     setFormData(prev => ({ ...prev, fournisseurId }))
     setSelectedFournisseur(fournisseur || null)
@@ -216,7 +244,7 @@ export default function AddInvoiceModal({
     }
   }
 
-  const addProduit = (produit) => {
+  const addProduit = (produit: { id: string; nom: string; type?: string; prixDefaut: number }) => {
     const existing = formData.produits.find(p => p.id === produit.id)
     if (existing) {
       updateProduitQuantite(produit.id, existing.quantite + 1)
@@ -238,7 +266,7 @@ export default function AddInvoiceModal({
     }
   }
 
-  const updateProduitQuantite = (produitId, newQuantite) => {
+  const updateProduitQuantite = (produitId: string, newQuantite: number) => {
     if (newQuantite <= 0) {
       removeProduit(produitId)
     } else {
@@ -253,7 +281,7 @@ export default function AddInvoiceModal({
     }
   }
 
-  const updateProduitPrix = (produitId, newPrix) => {
+  const updateProduitPrix = (produitId: string, newPrix: number) => {
     setFormData(prev => ({
       ...prev,
       produits: prev.produits.map(p => 
@@ -264,14 +292,14 @@ export default function AddInvoiceModal({
     }))
   }
 
-  const removeProduit = (produitId) => {
+  const removeProduit = (produitId: string) => {
     setFormData(prev => ({
       ...prev,
       produits: prev.produits.filter(p => p.id !== produitId)
     }))
   }
 
-  const handleTypeChange = (newType) => {
+  const handleTypeChange = (newType: string) => {
     setFormData(prev => ({
       ...prev,
       type: newType,
@@ -379,7 +407,7 @@ export default function AddInvoiceModal({
                     onChange={(e) => handleTypeChange(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                   >
-                    <option value="Achat">📦 Facture d'achat</option>
+                    <option value="Achat">📦 Facture d&apos;achat</option>
                     <option value="Retour">↩️ Note de retour</option>
                     <option value="Avoir">💰 Avoir fournisseur</option>
                   </select>
@@ -468,7 +496,7 @@ export default function AddInvoiceModal({
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Date d'échéance *
+                  Date d&apos;échéance *
                 </label>
                 <input
                   type="date"
@@ -770,7 +798,7 @@ export default function AddInvoiceModal({
               placeholder="Notes sur la facture, conditions particulières, observations..."
             />
             <div className="mt-1 text-xs text-gray-500">
-              Optionnel - Ces informations seront ajoutées à l'historique de la facture
+              Optionnel - Ces informations seront ajoutées à l&apos;historique de la facture
             </div>
           </div>
 
@@ -788,7 +816,7 @@ export default function AddInvoiceModal({
                   <span className="font-bold text-gray-900">{formData.type}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="font-medium text-gray-700">Nombre d'articles:</span>
+                  <span className="font-medium text-gray-700">Nombre d&apos;articles:</span>
                   <span className="font-bold text-gray-900">{formData.produits.length}</span>
                 </div>
                 <div className="flex justify-between">

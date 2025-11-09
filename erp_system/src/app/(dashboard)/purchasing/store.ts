@@ -1,4 +1,4 @@
-import { DemandRequest, PurchaseOrder, PurchaseOrderDetail, PurchaseOrderInput } from "./types";
+import { DemandRequest,  PurchaseOrderDetail, PurchaseOrderInput } from "./types";
 
 // ========================================
 // DEMAND REQUESTS (LocalStorage)

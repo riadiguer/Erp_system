@@ -33,8 +33,11 @@ export default function ResetPasswordPage() {
       await AuthApi.resetPassword({ uid, token, new_password: data.password });
       setDone(true);
       setTimeout(() => router.replace('/login'), 2000);
-    } catch (e: any) {
-      setError(e?.detail || 'Reset failed. The link may be invalid or expired.');
+    } catch (e: unknown) {
+      const errorMessage = e && typeof e === 'object' && 'detail' in e 
+        ? String(e.detail) 
+        : 'Reset failed. The link may be invalid or expired.';
+      setError(errorMessage);
     }
   };
 
@@ -190,7 +193,7 @@ export default function ResetPasswordPage() {
                 <span className="font-medium">Secure Connection</span>
               </div>
               <p>Your password is encrypted and stored securely</p>
-              <p>You'll be automatically signed out of other devices</p>
+              <p>You&apos;ll be automatically signed out of other devices</p>
             </div>
           </div>
         </div>

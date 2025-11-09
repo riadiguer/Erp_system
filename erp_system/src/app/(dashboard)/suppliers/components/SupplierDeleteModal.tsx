@@ -13,6 +13,23 @@ interface SupplierDeleteModalProps {
   onSuccess?: () => void;
 }
 
+// Type guard to check for a { message: string } shape
+function hasMessage(e: unknown): e is { message: string } {
+  return (
+    typeof e === "object" &&
+    e !== null &&
+    "message" in e &&
+    typeof (e as Record<string, unknown>).message === "string"
+  );
+}
+
+function getErrorMessage(e: unknown): string {
+  if (e instanceof Error) return e.message;
+  if (hasMessage(e)) return e.message;
+  if (typeof e === "string") return e;
+  return "Erreur lors de la suppression du fournisseur";
+}
+
 export default function SupplierDeleteModal({
   open,
   onClose,
@@ -23,22 +40,22 @@ export default function SupplierDeleteModal({
 
   if (!open) return null;
 
-  const handleDelete = async () => {
+  const handleDelete = async (): Promise<void> => {
     if (!supplier?.id) {
       toast.error("Aucun fournisseur sélectionné");
       return;
     }
 
     setLoading(true);
-
     try {
       await WarehouseApi.suppliers.remove(supplier.id);
       toast.success(`Fournisseur "${supplier.name}" supprimé avec succès`);
       onSuccess?.();
       onClose();
-    } catch (error: any) {
+    } catch (error: unknown) {
+      // ✅ Fully typed error handling
       console.error("Erreur lors de la suppression:", error);
-      toast.error(error?.message || "Erreur lors de la suppression du fournisseur");
+      toast.error(getErrorMessage(error));
     } finally {
       setLoading(false);
     }
@@ -47,30 +64,19 @@ export default function SupplierDeleteModal({
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md transform animate-in zoom-in-95 duration-200">
-        
-        {/* Header avec icône d'alerte */}
+        {/* Header */}
         <div className="relative px-6 pt-6 pb-4">
-          {/* Decorative background */}
-          <div className="absolute top-0 left-0 w-full h-24 bg-gradient-to-br from-red-50 to-orange-50 rounded-t-2xl opacity-50"></div>
-          
+          <div className="absolute top-0 left-0 w-full h-24 bg-gradient-to-br from-red-50 to-orange-50 rounded-t-2xl opacity-50" />
           <div className="relative flex items-start justify-between">
             <div className="flex items-start space-x-4">
-              {/* Icon avec animation */}
               <div className="flex-shrink-0 w-14 h-14 bg-gradient-to-br from-red-500 to-red-600 rounded-2xl shadow-lg shadow-red-200 flex items-center justify-center animate-pulse">
                 <AlertTriangle className="w-7 h-7 text-white" />
               </div>
-              
               <div>
-                <h2 className="text-xl font-bold text-gray-900 mb-1">
-                  Confirmer la suppression
-                </h2>
-                <p className="text-sm text-gray-600">
-                  Cette action est irréversible
-                </p>
+                <h2 className="text-xl font-bold text-gray-900 mb-1">Confirmer la suppression</h2>
+                <p className="text-sm text-gray-600">Cette action est irréversible</p>
               </div>
             </div>
-            
-            {/* Bouton fermer */}
             <button
               onClick={onClose}
               disabled={loading}
@@ -82,38 +88,31 @@ export default function SupplierDeleteModal({
           </div>
         </div>
 
-        {/* Corps du modal */}
+        {/* Body */}
         <div className="px-6 py-4 space-y-4">
-          {/* Nom du fournisseur en surbrillance */}
           <div className="bg-red-50 border border-red-200 rounded-xl p-4">
             <p className="text-sm text-gray-700 mb-2">
               Vous êtes sur le point de supprimer le fournisseur :
             </p>
-            <p className="text-lg font-bold text-red-600">
-              {supplier?.name || "—"}
-            </p>
+            <p className="text-lg font-bold text-red-600">{supplier?.name ?? "—"}</p>
             {supplier?.contact_name && (
-              <p className="text-sm text-gray-600 mt-1">
-                Contact: {supplier.contact_name}
-              </p>
+              <p className="text-sm text-gray-600 mt-1">Contact: {supplier.contact_name}</p>
             )}
-            {supplier?.materials_count !== undefined && supplier.materials_count > 0 && (
+            {typeof supplier?.materials_count === "number" && supplier.materials_count > 0 && (
               <div className="mt-3 pt-3 border-t border-red-200">
                 <p className="text-sm font-semibold text-red-700">
-                  ⚠️ Ce fournisseur est lié à {supplier.materials_count} matériau{supplier.materials_count > 1 ? 'x' : ''}
+                  ⚠️ Ce fournisseur est lié à {supplier.materials_count} matériau
+                  {supplier.materials_count > 1 ? "x" : ""}
                 </p>
               </div>
             )}
           </div>
 
-          {/* Avertissement détaillé */}
           <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
             <div className="flex items-start space-x-3">
               <Shield className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
               <div className="text-sm text-gray-700 space-y-2">
-                <p className="font-semibold text-amber-900">
-                  Données qui seront affectées :
-                </p>
+                <p className="font-semibold text-amber-900">Données qui seront affectées :</p>
                 <ul className="list-disc list-inside space-y-1 text-gray-600">
                   <li>Toutes les informations du fournisseur</li>
                   <li>Les matériaux liés devront être réassignés</li>
@@ -124,25 +123,24 @@ export default function SupplierDeleteModal({
             </div>
           </div>
 
-          {/* Message final */}
           <p className="text-sm text-gray-600 text-center font-medium">
             Cette opération ne peut pas être annulée.
           </p>
         </div>
 
-        {/* Footer avec boutons */}
+        {/* Footer */}
         <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 rounded-b-2xl flex items-center justify-end gap-3">
           <button
             onClick={onClose}
             disabled={loading}
-            className="px-5 py-2.5 border border-gray-300 rounded-xl text-gray-700 font-medium hover:bg-gray-100 transition-all duration-200 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-5 py-2.5 border border-gray-300 rounded-xl text-gray-700 font-medium hover:bg-gray-100 transition-all duration-200 hover:scale-105 disabled:opacity-50"
           >
             Annuler
           </button>
           <button
             onClick={handleDelete}
             disabled={loading}
-            className="group px-5 py-2.5 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-xl font-semibold shadow-lg shadow-red-200 hover:shadow-xl hover:shadow-red-300 transition-all duration-200 hover:scale-105 flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+            className="group px-5 py-2.5 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-xl font-semibold shadow-lg shadow-red-200 hover:shadow-xl hover:shadow-red-300 transition-all duration-200 hover:scale-105 flex items-center space-x-2 disabled:opacity-50"
           >
             {loading ? (
               <>

@@ -17,6 +17,22 @@ import {
   useSalesPoints,
 } from '@/lib/features/sales/hooks';
 
+interface QuoteLine {
+  product: string;
+  description?: string;
+  quantity: number;
+}
+
+interface QuoteLineRow extends QuoteLine {
+  _unit_price: number;
+  _tax_rate: number;
+}
+
+interface ApiError {
+  status?: number;
+  detail?: string;
+}
+
 export default function QuotesPage() {
   const router = useRouter();
   const { quotes, loading, error, refresh } = useQuotes();
@@ -29,7 +45,7 @@ export default function QuotesPage() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   const [form, setForm] = useState<QuoteCreateInput>({
-    customer: '' as any,
+    customer: '' as string,
     sales_point: undefined,
     currency: 'DZD',
     valid_until: '',
@@ -49,7 +65,7 @@ export default function QuotesPage() {
       });
       setCreating(false);
       setForm({
-        customer: '' as any,
+        customer: '' as string,
         sales_point: undefined,
         currency: 'DZD',
         valid_until: '',
@@ -58,12 +74,13 @@ export default function QuotesPage() {
       });
       await refresh();
       router.push(`/sales/quotes/${q.id}`);
-    } catch (e: any) {
-      if (e?.status === 400) setActionError(e?.detail || 'Invalid quote data.');
-      else if (e?.status === 401) setActionError('Please sign in again.');
-      else if (e?.status === 403) setActionError('You do not have permission to create quotes.');
-      else if (e?.status >= 500) setActionError('Server error. Try again later.');
-      else setActionError(e?.detail || 'Failed to create quote.');
+    } catch (e: unknown) {
+      const error = e as ApiError;
+      if (error?.status === 400) setActionError(error?.detail || 'Invalid quote data.');
+      else if (error?.status === 401) setActionError('Please sign in again.');
+      else if (error?.status === 403) setActionError('You do not have permission to create quotes.');
+      else if (error?.status && error.status >= 500) setActionError('Server error. Try again later.');
+      else setActionError(error?.detail || 'Failed to create quote.');
     } finally {
       setActionLoading(null);
     }
@@ -124,7 +141,7 @@ export default function QuotesPage() {
                   <select
                     className="w-full rounded-xl border border-gray-300 px-4 py-3 bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
                     value={form.customer || ''}
-                    onChange={(e) => setForm((f) => ({ ...f, customer: e.target.value as any }))}
+                    onChange={(e) => setForm((f) => ({ ...f, customer: e.target.value as string }))}
                   >
                     <option value="">Select a customer...</option>
                     {customers?.map((c) => (
@@ -138,7 +155,7 @@ export default function QuotesPage() {
                   <label className="block text-sm font-semibold text-gray-700">Sales Point *</label>
                   <select
                     className="w-full rounded-xl border border-gray-300 px-4 py-3 bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                    value={(form as any).sales_point ?? ''}
+                    value={form.sales_point ?? ''}
                     onChange={(e) => setForm((f) => ({ ...f, sales_point: Number(e.target.value) }))}
                   >
                     <option value="">Select a sales point...</option>
@@ -303,7 +320,7 @@ export default function QuotesPage() {
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-12 text-center">
             <div className="mx-auto w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-6">
               <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2v-7a2 2 0 00-2-2H5a2 2 0 00-2 2z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2v-7a2 2 0 00-2-2H5a2 2 0 00-2 2v7a2 2 0 002 2z" />
               </svg>
             </div>
             <h3 className="text-xl font-semibold text-gray-900 mb-2">No quotes yet</h3>
@@ -331,15 +348,15 @@ function LinesEditor({
   onChange,
 }: {
   products: { id: string; sku: string; name: string; tax_rate: string; unit_price: string }[];
-  onChange: (lines: { product: string; description?: string; quantity: number }[]) => void;
+  onChange: (lines: QuoteLine[]) => void;
 }) {
-  const [rows, setRows] = useState<any[]>([]);
+  const [rows, setRows] = useState<QuoteLineRow[]>([]);
 
   function addRow() {
     setRows((r) => [...r, { product: '', description: '', quantity: 1, _unit_price: 0, _tax_rate: 0 }]);
   }
 
-  function update(i: number, patch: any) {
+  function update(i: number, patch: Partial<QuoteLineRow>) {
     setRows((r) => {
       const copy = [...r];
       copy[i] = { ...copy[i], ...patch };
@@ -405,7 +422,7 @@ function LinesEditor({
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
             </svg>
             <p className="font-medium">No items added yet</p>
-            <p className="text-sm">Click "Add Item" to start building your quote</p>
+            <p className="text-sm">Click &quot;Add Item&quot; to start building your quote</p>
           </div>
         ) : (
           rows.map((row, i) => (

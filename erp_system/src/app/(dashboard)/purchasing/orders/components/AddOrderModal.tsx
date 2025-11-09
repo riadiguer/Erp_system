@@ -1,200 +1,213 @@
 'use client'
+
 import React, { useState } from 'react'
-import { X, Plus, Check, Building, AlertTriangle, Package, Calendar } from 'lucide-react'
+import { X, Plus, Check, Building, AlertTriangle, Package, Calendar, Loader2 } from 'lucide-react'
+import { WarehouseApi } from '@/lib/features/warehouse/api'
+import type { Supplier, Material, PurchaseOrderInput } from '@/lib/features/warehouse/api'
 
 interface AddOrderModalProps {
   isOpen: boolean
   onClose: () => void
-  onSave: (formData: any) => void
-  fournisseursDispo: Array<{
-    id: string
-    nom: string
-    email: string
-    telephone: string
-    adresse: string
-  }>
-  produitsDispo: Array<{
-    id: string
-    nom: string
-    type: 'produit' | 'matiere'
-    prixUnitaire: number
-  }>
+  onSuccess: () => void
+  suppliers: Supplier[]
+  materials: Material[]
+}
+
+interface OrderItem {
+  material: number
+  material_name?: string
+  quantity: string
+  unit_price: string
 }
 
 export default function AddOrderModal({ 
   isOpen, 
   onClose, 
-  onSave, 
-  fournisseursDispo, 
-  produitsDispo 
+  onSuccess,
+  suppliers, 
+  materials 
 }: AddOrderModalProps) {
+  const [loading, setLoading] = useState(false)
   const [formData, setFormData] = useState({
-    fournisseur: { id: '', nom: '', email: '', telephone: '', adresse: '' },
-    priorite: 'Moyenne',
-    dateExpiration: '',
-    produits: [] as Array<{
-      id: string
-      nom: string
-      type: 'produit' | 'matiere'
-      quantite: number
-      prixUnitaire: number
-    }>,
-    commentaires: '',
-    gestionnaire: '',
-    montantTotal: 0
+    supplier: 0,
+    order_date: new Date().toISOString().split('T')[0],
+    expected_delivery_date: '',
+    notes: '',
+    items: [] as OrderItem[]
   })
 
   const [errors, setErrors] = useState({
-    fournisseur: '',
-    dateExpiration: '',
-    produits: '',
-    gestionnaire: ''
+    supplier: '',
+    expected_delivery_date: '',
+    items: '',
+    general: ''
   })
 
   if (!isOpen) return null
 
   const validateForm = () => {
     const newErrors = {
-      fournisseur: '',
-      dateExpiration: '',
-      produits: '',
-      gestionnaire: ''
+      supplier: '',
+      expected_delivery_date: '',
+      items: '',
+      general: ''
     }
 
-    if (!formData.fournisseur.id) {
-      newErrors.fournisseur = 'Veuillez sélectionner un fournisseur'
+    if (!formData.supplier || formData.supplier === 0) {
+      newErrors.supplier = 'Veuillez sélectionner un fournisseur'
     }
 
-    if (!formData.dateExpiration) {
-      newErrors.dateExpiration = 'La date d\'expiration est requise'
+    if (!formData.expected_delivery_date) {
+      newErrors.expected_delivery_date = 'La date de livraison est requise'
     } else {
       const today = new Date().toISOString().split('T')[0]
-      if (formData.dateExpiration <= today) {
-        newErrors.dateExpiration = 'La date d\'expiration doit être dans le futur'
+      if (formData.expected_delivery_date < today) {
+        newErrors.expected_delivery_date = 'La date de livraison doit être dans le futur'
       }
     }
 
-    if (formData.produits.length === 0) {
-      newErrors.produits = 'Au moins un produit doit être sélectionné'
+    if (formData.items.length === 0) {
+      newErrors.items = 'Au moins un article doit être sélectionné'
     }
 
-    if (!formData.gestionnaire.trim()) {
-      newErrors.gestionnaire = 'Le nom du gestionnaire est requis'
+    // Validate item quantities and prices
+    const hasInvalidItems = formData.items.some(
+      item => parseFloat(item.quantity) <= 0 || parseFloat(item.unit_price) < 0
+    )
+    if (hasInvalidItems) {
+      newErrors.items = 'Tous les articles doivent avoir une quantité > 0 et un prix >= 0'
     }
 
     setErrors(newErrors)
     return !Object.values(newErrors).some(error => error !== '')
   }
 
-  const calculateMontantTotal = (produits) => {
-    return produits.reduce((total, produit) => total + (produit.quantite * produit.prixUnitaire), 0)
+  const calculateTotal = () => {
+    return formData.items.reduce((total, item) => {
+      return total + (parseFloat(item.quantity) * parseFloat(item.unit_price))
+    }, 0)
   }
 
-  const handleSave = () => {
-    const updatedFormData = {
-      ...formData,
-      montantTotal: calculateMontantTotal(formData.produits)
-    }
+  const handleSave = async () => {
+    if (!validateForm()) return
 
-    if (validateForm()) {
-      onSave(updatedFormData)
+    setLoading(true)
+    setErrors({ ...errors, general: '' })
+
+    try {
+      // Generate order number (format: BC-YYYY-XXXX)
+      const year = new Date().getFullYear()
+      const randomNum = Math.floor(Math.random() * 10000).toString().padStart(4, '0')
+      const order_number = `BC-${year}-${randomNum}`
+
+      const payload: PurchaseOrderInput = {
+        order_number,
+        supplier: formData.supplier,
+        order_date: formData.order_date,
+        expected_delivery_date: formData.expected_delivery_date || null,
+        notes: formData.notes || undefined,
+        status: 'draft',
+        items: formData.items.map(item => ({
+          material: item.material,
+          quantity: item.quantity,
+          unit_price: item.unit_price
+        }))
+      }
+
+      await WarehouseApi.purchaseOrders.create(payload)
+      
       // Reset form
       setFormData({
-        fournisseur: { id: '', nom: '', email: '', telephone: '', adresse: '' },
-        priorite: 'Moyenne',
-        dateExpiration: '',
-        produits: [],
-        commentaires: '',
-        gestionnaire: '',
-        montantTotal: 0
+        supplier: 0,
+        order_date: new Date().toISOString().split('T')[0],
+        expected_delivery_date: '',
+        notes: '',
+        items: []
       })
-      setErrors({ fournisseur: '', dateExpiration: '', produits: '', gestionnaire: '' })
+      
+      onSuccess()
+    } catch (error: unknown) {
+      console.error('Error creating purchase order:', error)
+      setErrors({ 
+        ...errors, 
+          general: error instanceof Error ? error.message : 'Erreur lors de la création du bon de commande'})
+    } finally {
+      setLoading(false)
     }
   }
 
-  const handleFournisseurChange = (fournisseurId) => {
-    const fournisseur = fournisseursDispo.find(f => f.id === fournisseurId)
-    setFormData({
-      ...formData,
-      fournisseur: fournisseur || { id: '', nom: '', email: '', telephone: '', adresse: '' }
-    })
-    if (errors.fournisseur) {
-      setErrors({ ...errors, fournisseur: '' })
+  const handleSupplierChange = (supplierId: number) => {
+    setFormData({ ...formData, supplier: supplierId })
+    if (errors.supplier) {
+      setErrors({ ...errors, supplier: '' })
     }
   }
 
-  const addProduitToForm = (produit) => {
-    const existing = formData.produits.find(p => p.id === produit.id)
+  const addMaterialToForm = (material: Material) => {
+    const existing = formData.items.find(item => item.material === material.id)
+    
     if (existing) {
-      const updatedProduits = formData.produits.map(p => 
-        p.id === produit.id ? { ...p, quantite: p.quantite + 1 } : p
+      // Increment quantity if already exists
+      const updatedItems = formData.items.map(item => 
+        item.material === material.id 
+          ? { ...item, quantity: (parseFloat(item.quantity) + 1).toString() }
+          : item
       )
-      setFormData({
-        ...formData,
-        produits: updatedProduits,
-        montantTotal: calculateMontantTotal(updatedProduits)
-      })
+      setFormData({ ...formData, items: updatedItems })
     } else {
-      const updatedProduits = [...formData.produits, { ...produit, quantite: 1 }]
-      setFormData({
-        ...formData,
-        produits: updatedProduits,
-        montantTotal: calculateMontantTotal(updatedProduits)
-      })
+      // Add new item
+      const newItem: OrderItem = {
+        material: material.id,
+        material_name: material.name,
+        quantity: '1',
+        unit_price: material.price
+      }
+      setFormData({ ...formData, items: [...formData.items, newItem] })
     }
-    if (errors.produits) {
-      setErrors({ ...errors, produits: '' })
+    
+    if (errors.items) {
+      setErrors({ ...errors, items: '' })
     }
   }
 
-  const updateProduitQuantity = (produitId, newQuantite) => {
-    if (newQuantite <= 0) {
-      removeProduitFromForm(produitId)
+  const updateItemQuantity = (materialId: number, newQuantity: string) => {
+    const qty = parseFloat(newQuantity)
+    
+    if (qty <= 0 || isNaN(qty)) {
+      removeItemFromForm(materialId)
     } else {
-      const updatedProduits = formData.produits.map(p => 
-        p.id === produitId ? { ...p, quantite: newQuantite } : p
+      const updatedItems = formData.items.map(item => 
+        item.material === materialId ? { ...item, quantity: newQuantity } : item
       )
-      setFormData({
-        ...formData,
-        produits: updatedProduits,
-        montantTotal: calculateMontantTotal(updatedProduits)
-      })
+      setFormData({ ...formData, items: updatedItems })
     }
   }
 
-  const updateProduitPrice = (produitId, newPrice) => {
-    const updatedProduits = formData.produits.map(p => 
-      p.id === produitId ? { ...p, prixUnitaire: newPrice } : p
+  const updateItemPrice = (materialId: number, newPrice: string) => {
+    const updatedItems = formData.items.map(item => 
+      item.material === materialId ? { ...item, unit_price: newPrice } : item
     )
-    setFormData({
-      ...formData,
-      produits: updatedProduits,
-      montantTotal: calculateMontantTotal(updatedProduits)
-    })
+    setFormData({ ...formData, items: updatedItems })
   }
 
-  const removeProduitFromForm = (produitId) => {
-    const updatedProduits = formData.produits.filter(p => p.id !== produitId)
-    setFormData({
-      ...formData,
-      produits: updatedProduits,
-      montantTotal: calculateMontantTotal(updatedProduits)
-    })
+  const removeItemFromForm = (materialId: number) => {
+    const updatedItems = formData.items.filter(item => item.material !== materialId)
+    setFormData({ ...formData, items: updatedItems })
   }
 
   const handleClose = () => {
     setFormData({
-      fournisseur: { id: '', nom: '', email: '', telephone: '', adresse: '' },
-      priorite: 'Moyenne',
-      dateExpiration: '',
-      produits: [],
-      commentaires: '',
-      gestionnaire: '',
-      montantTotal: 0
+      supplier: 0,
+      order_date: new Date().toISOString().split('T')[0],
+      expected_delivery_date: '',
+      notes: '',
+      items: []
     })
-    setErrors({ fournisseur: '', dateExpiration: '', produits: '', gestionnaire: '' })
+    setErrors({ supplier: '', expected_delivery_date: '', items: '', general: '' })
     onClose()
   }
+
+  const selectedSupplier = suppliers.find(s => s.id === formData.supplier)
 
   return (
     <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
@@ -210,11 +223,23 @@ export default function AddOrderModal({
           </h3>
           <button 
             onClick={handleClose}
-            className="text-gray-400 hover:text-gray-600 p-2 rounded-full hover:bg-white/50 transition-colors"
+            disabled={loading}
+            className="text-gray-400 hover:text-gray-600 p-2 rounded-full hover:bg-white/50 transition-colors disabled:opacity-50"
           >
             <X className="w-6 h-6" />
           </button>
         </div>
+
+        {/* Error Alert */}
+        {errors.general && (
+          <div className="m-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start">
+            <AlertTriangle className="w-5 h-5 text-red-600 mr-3 flex-shrink-0 mt-0.5" />
+            <div>
+              <h4 className="text-sm font-semibold text-red-800">Erreur</h4>
+              <p className="text-sm text-red-700">{errors.general}</p>
+            </div>
+          </div>
+        )}
 
         {/* Modal Content */}
         <div className="p-6 space-y-6">
@@ -232,39 +257,46 @@ export default function AddOrderModal({
                   Fournisseur *
                 </label>
                 <select
-                  value={formData.fournisseur.id}
-                  onChange={(e) => handleFournisseurChange(e.target.value)}
-                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 ${
-                    errors.fournisseur ? 'border-red-500' : 'border-gray-300'
+                  value={formData.supplier}
+                  onChange={(e) => handleSupplierChange(parseInt(e.target.value))}
+                  disabled={loading}
+                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 disabled:bg-gray-100 disabled:cursor-not-allowed ${
+                    errors.supplier ? 'border-red-500' : 'border-gray-300'
                   }`}
                 >
-                  <option value="">Sélectionner un fournisseur</option>
-                  {fournisseursDispo.map((fournisseur) => (
-                    <option key={fournisseur.id} value={fournisseur.id}>
-                      {fournisseur.nom} - {fournisseur.email}
+                  <option value={0}>Sélectionner un fournisseur</option>
+                  {suppliers.map((supplier) => (
+                    <option key={supplier.id} value={supplier.id}>
+                      {supplier.name} {supplier.email ? `- ${supplier.email}` : ''}
                     </option>
                   ))}
                 </select>
-                {errors.fournisseur && (
-                  <p className="mt-1 text-sm text-red-600">{errors.fournisseur}</p>
+                {errors.supplier && (
+                  <p className="mt-1 text-sm text-red-600">{errors.supplier}</p>
                 )}
               </div>
 
-              {formData.fournisseur.id && (
+              {selectedSupplier && (
                 <div className="bg-white p-4 rounded-lg border border-blue-200">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <span className="font-medium text-gray-600">Email:</span>
-                      <p className="text-gray-900">{formData.fournisseur.email}</p>
-                    </div>
-                    <div>
-                      <span className="font-medium text-gray-600">Téléphone:</span>
-                      <p className="text-gray-900">{formData.fournisseur.telephone}</p>
-                    </div>
-                    <div className="md:col-span-2">
-                      <span className="font-medium text-gray-600">Adresse:</span>
-                      <p className="text-gray-900">{formData.fournisseur.adresse}</p>
-                    </div>
+                    {selectedSupplier.email && (
+                      <div>
+                        <span className="font-medium text-gray-600">Email:</span>
+                        <p className="text-gray-900">{selectedSupplier.email}</p>
+                      </div>
+                    )}
+                    {selectedSupplier.phone && (
+                      <div>
+                        <span className="font-medium text-gray-600">Téléphone:</span>
+                        <p className="text-gray-900">{selectedSupplier.phone}</p>
+                      </div>
+                    )}
+                    {selectedSupplier.address && (
+                      <div className="md:col-span-2">
+                        <span className="font-medium text-gray-600">Adresse:</span>
+                        <p className="text-gray-900">{selectedSupplier.address}</p>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -272,219 +304,221 @@ export default function AddOrderModal({
           </div>
 
           {/* Détails du bon de commande */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                <AlertTriangle className="w-4 h-4 inline mr-2" />
-                Priorité *
+                <Calendar className="w-4 h-4 inline mr-2" />
+                Date de commande
               </label>
-              <select
-                value={formData.priorite}
-                onChange={(e) => setFormData({ ...formData, priorite: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
-              >
-                <option value="Basse">🟢 Basse</option>
-                <option value="Moyenne">🟡 Moyenne</option>
-                <option value="Haute">🔴 Haute</option>
-              </select>
+              <input
+                type="date"
+                value={formData.order_date}
+                onChange={(e) => setFormData({ ...formData, order_date: e.target.value })}
+                disabled={loading}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 disabled:bg-gray-100"
+              />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 <Calendar className="w-4 h-4 inline mr-2" />
-                Date d'expiration *
+                Date de livraison prévue *
               </label>
               <input
                 type="date"
-                value={formData.dateExpiration}
+                value={formData.expected_delivery_date}
                 onChange={(e) => {
-                  setFormData({ ...formData, dateExpiration: e.target.value })
-                  if (errors.dateExpiration) {
-                    setErrors({ ...errors, dateExpiration: '' })
+                  setFormData({ ...formData, expected_delivery_date: e.target.value })
+                  if (errors.expected_delivery_date) {
+                    setErrors({ ...errors, expected_delivery_date: '' })
                   }
                 }}
-                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 ${
-                  errors.dateExpiration ? 'border-red-500' : 'border-gray-300'
+                disabled={loading}
+                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 disabled:bg-gray-100 ${
+                  errors.expected_delivery_date ? 'border-red-500' : 'border-gray-300'
                 }`}
-                min={new Date(Date.now() + 86400000).toISOString().split('T')[0]}
+                min={new Date().toISOString().split('T')[0]}
               />
-              {errors.dateExpiration && (
-                <p className="mt-1 text-sm text-red-600">{errors.dateExpiration}</p>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Gestionnaire *
-              </label>
-              <input
-                type="text"
-                value={formData.gestionnaire}
-                onChange={(e) => {
-                  setFormData({ ...formData, gestionnaire: e.target.value })
-                  if (errors.gestionnaire) {
-                    setErrors({ ...errors, gestionnaire: '' })
-                  }
-                }}
-                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 ${
-                  errors.gestionnaire ? 'border-red-500' : 'border-gray-300'
-                }`}
-                placeholder="Nom du gestionnaire"
-              />
-              {errors.gestionnaire && (
-                <p className="mt-1 text-sm text-red-600">{errors.gestionnaire}</p>
+              {errors.expected_delivery_date && (
+                <p className="mt-1 text-sm text-red-600">{errors.expected_delivery_date}</p>
               )}
             </div>
           </div>
 
-          {/* Sélection des produits */}
+          {/* Sélection des matériaux */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-3">
               <Package className="w-4 h-4 inline mr-2" />
-              Produits et matières premières disponibles
+              Matériaux disponibles
             </label>
             <div className="border border-gray-300 rounded-lg max-h-48 overflow-y-auto">
-              {produitsDispo.map((produit) => (
-                <div key={produit.id} className="flex items-center justify-between p-3 border-b border-gray-100 last:border-b-0 hover:bg-gray-50 transition-colors">
-                  <div className="flex items-center space-x-3">
-                    <div className={`w-3 h-3 rounded-full ${produit.type === 'produit' ? 'bg-blue-500' : 'bg-green-500'}`} />
-                    <div>
-                      <span className="text-sm font-medium text-gray-900">{produit.nom}</span>
-                      <div className="flex items-center space-x-2 mt-1">
-                        <span className={`px-2 py-1 text-xs rounded-full font-medium ${
-                          produit.type === 'produit' 
-                            ? 'bg-blue-100 text-blue-800 border border-blue-200' 
-                            : 'bg-green-100 text-green-800 border border-green-200'
-                        }`}>
-                          {produit.type === 'produit' ? 'Produit' : 'Matière première'}
+              {materials.length === 0 ? (
+                <div className="p-4 text-center text-gray-500 text-sm">
+                  Aucun matériau disponible
+                </div>
+              ) : (
+                materials.map((material) => (
+                  <div key={material.id} className="flex items-center justify-between p-3 border-b border-gray-100 last:border-b-0 hover:bg-gray-50 transition-colors">
+                    <div className="flex items-center space-x-3 flex-1 min-w-0">
+                      <div className="w-3 h-3 rounded-full bg-blue-500" />
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm font-medium text-gray-900 block truncate">
+                          {material.name}
                         </span>
-                        <span className="text-xs text-gray-500">
-                          Prix: {produit.prixUnitaire} DT
-                        </span>
+                        <div className="flex items-center space-x-2 mt-1">
+                          <span className="px-2 py-1 text-xs rounded-full font-medium bg-gray-100 text-gray-800 border border-gray-200">
+                            {material.reference}
+                          </span>
+                          <span className="text-xs text-gray-500">
+                            Prix: {parseFloat(material.price).toLocaleString()} DT / {material.unit}
+                          </span>
+                          <span className={`text-xs font-medium ${
+                            material.is_low_stock ? 'text-red-600' : 'text-green-600'
+                          }`}>
+                            Stock: {parseFloat(material.stock).toLocaleString()}
+                          </span>
+                        </div>
                       </div>
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => addMaterialToForm(material)}
+                      disabled={loading}
+                      className="text-green-600 hover:text-green-800 p-2 rounded-full hover:bg-green-50 transition-colors disabled:opacity-50 flex-shrink-0"
+                      title={`Ajouter ${material.name}`}
+                    >
+                      <Plus className="w-4 h-4" />
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => addProduitToForm(produit)}
-                    className="text-green-600 hover:text-green-800 p-2 rounded-full hover:bg-green-50 transition-colors"
-                    title={`Ajouter ${produit.nom}`}
-                  >
-                    <Plus className="w-4 h-4" />
-                  </button>
-                </div>
-              ))}
+                ))
+              )}
             </div>
-            {errors.produits && (
+            {errors.items && (
               <p className="mt-2 text-sm text-red-600 flex items-center">
                 <AlertTriangle className="w-4 h-4 mr-1" />
-                {errors.produits}
+                {errors.items}
               </p>
             )}
           </div>
 
-          {/* Produits sélectionnés */}
-          {formData.produits.length > 0 && (
+          {/* Articles sélectionnés */}
+          {formData.items.length > 0 && (
             <div className="bg-green-50 border border-green-200 rounded-lg p-4">
               <h4 className="text-lg font-semibold text-gray-900 mb-3 flex items-center justify-between">
                 <span className="flex items-center">
                   <Check className="w-5 h-5 text-green-600 mr-2" />
-                  Articles sélectionnés ({formData.produits.length})
+                  Articles sélectionnés ({formData.items.length})
                 </span>
                 <span className="text-xl font-bold text-green-700">
-                  Total: {formData.montantTotal.toLocaleString()} DT
+                  Total: {calculateTotal().toLocaleString('fr-FR', { minimumFractionDigits: 2 })} DT
                 </span>
               </h4>
               
               <div className="space-y-3">
-                {formData.produits.map((produit, index) => (
-                  <div key={produit.id} className="bg-white rounded-lg p-4 border border-green-200 shadow-sm">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        <div className="flex items-center justify-center w-6 h-6 bg-green-100 rounded-full text-xs font-bold text-green-800">
-                          {index + 1}
-                        </div>
-                        <div className={`w-3 h-3 rounded-full ${produit.type === 'produit' ? 'bg-blue-500' : 'bg-green-500'}`} />
-                        <div>
-                          <span className="text-sm font-medium text-gray-900">{produit.nom}</span>
-                          <div className={`inline-block ml-2 px-2 py-1 text-xs rounded-full ${
-                            produit.type === 'produit' 
-                              ? 'bg-blue-100 text-blue-800' 
-                              : 'bg-green-100 text-green-800'
-                          }`}>
-                            {produit.type === 'produit' ? 'Produit' : 'Matière première'}
+                {formData.items.map((item, index) => {
+                  const material = materials.find(m => m.id === item.material)
+                  return (
+                    <div key={item.material} className="bg-white rounded-lg p-4 border border-green-200 shadow-sm">
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="flex items-center space-x-3 min-w-0">
+                          <div className="flex items-center justify-center w-6 h-6 bg-green-100 rounded-full text-xs font-bold text-green-800 flex-shrink-0">
+                            {index + 1}
+                          </div>
+                          <div className="w-3 h-3 rounded-full bg-blue-500 flex-shrink-0" />
+                          <div className="min-w-0">
+                            <span className="text-sm font-medium text-gray-900 block truncate">
+                              {item.material_name || material?.name || `Matériau #${item.material}`}
+                            </span>
+                            {material && (
+                              <span className="text-xs text-gray-500">
+                                Ref: {material.reference} • Unité: {material.unit}
+                              </span>
+                            )}
                           </div>
                         </div>
-                      </div>
-                      
-                      <div className="flex items-center space-x-4">
-                        {/* Quantité */}
-                        <div className="flex items-center space-x-2 bg-gray-50 rounded-lg p-2">
-                          <button
-                            type="button"
-                            onClick={() => updateProduitQuantity(produit.id, produit.quantite - 1)}
-                            className="w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center hover:bg-gray-300 transition-colors text-gray-600 font-bold"
-                          >
-                            -
-                          </button>
-                          <span className="w-8 text-center text-sm font-bold text-gray-900">{produit.quantite}</span>
-                          <button
-                            type="button"
-                            onClick={() => updateProduitQuantity(produit.id, produit.quantite + 1)}
-                            className="w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center hover:bg-gray-300 transition-colors text-gray-600 font-bold"
-                          >
-                            +
-                          </button>
-                        </div>
-
-                        {/* Prix unitaire */}
-                        <div className="flex items-center space-x-2">
-                          <span className="text-sm text-gray-600">Prix:</span>
-                          <input
-                            type="number"
-                            value={produit.prixUnitaire}
-                            onChange={(e) => updateProduitPrice(produit.id, parseFloat(e.target.value) || 0)}
-                            className="w-20 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-green-500 focus:border-green-500"
-                            min="0"
-                            step="0.01"
-                          />
-                          <span className="text-sm text-gray-600">DT</span>
-                        </div>
-
-                        {/* Sous-total */}
-                        <div className="text-right min-w-[80px]">
-                          <div className="text-sm text-gray-600">Sous-total:</div>
-                          <div className="text-sm font-bold text-gray-900">
-                            {(produit.quantite * produit.prixUnitaire).toLocaleString()} DT
+                        
+                        <div className="flex items-center space-x-4 flex-shrink-0">
+                          {/* Quantité */}
+                          <div className="flex items-center space-x-2 bg-gray-50 rounded-lg p-2">
+                            <button
+                              type="button"
+                              onClick={() => updateItemQuantity(item.material, (parseFloat(item.quantity) - 1).toString())}
+                              disabled={loading}
+                              className="w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center hover:bg-gray-300 transition-colors text-gray-600 font-bold disabled:opacity-50"
+                            >
+                              -
+                            </button>
+                            <input
+                              type="number"
+                              value={item.quantity}
+                              onChange={(e) => updateItemQuantity(item.material, e.target.value)}
+                              disabled={loading}
+                              className="w-16 text-center text-sm font-bold text-gray-900 border border-gray-300 rounded px-1 py-1 disabled:bg-gray-100"
+                              min="0"
+                              step="1"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => updateItemQuantity(item.material, (parseFloat(item.quantity) + 1).toString())}
+                              disabled={loading}
+                              className="w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center hover:bg-gray-300 transition-colors text-gray-600 font-bold disabled:opacity-50"
+                            >
+                              +
+                            </button>
                           </div>
-                        </div>
 
-                        <button
-                          type="button"
-                          onClick={() => removeProduitFromForm(produit.id)}
-                          className="text-red-600 hover:text-red-800 p-2 rounded-full hover:bg-red-50 transition-colors"
-                          title={`Supprimer ${produit.nom}`}
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
+                          {/* Prix unitaire */}
+                          <div className="flex items-center space-x-2">
+                            <span className="text-sm text-gray-600">Prix:</span>
+                            <input
+                              type="number"
+                              value={item.unit_price}
+                              onChange={(e) => updateItemPrice(item.material, e.target.value)}
+                              disabled={loading}
+                              className="w-24 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-green-500 focus:border-green-500 disabled:bg-gray-100"
+                              min="0"
+                              step="0.01"
+                            />
+                            <span className="text-sm text-gray-600">DT</span>
+                          </div>
+
+                          {/* Sous-total */}
+                          <div className="text-right min-w-[100px]">
+                            <div className="text-xs text-gray-600">Sous-total:</div>
+                            <div className="text-sm font-bold text-gray-900">
+                              {(parseFloat(item.quantity) * parseFloat(item.unit_price)).toLocaleString('fr-FR', { minimumFractionDigits: 2 })} DT
+                            </div>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => removeItemFromForm(item.material)}
+                            disabled={loading}
+                            className="text-red-600 hover:text-red-800 p-2 rounded-full hover:bg-red-50 transition-colors disabled:opacity-50"
+                            title="Supprimer"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             </div>
           )}
 
-          {/* Commentaires */}
+          {/* Notes */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Commentaires et instructions spéciales
+              Notes et instructions
             </label>
             <textarea
-              value={formData.commentaires}
-              onChange={(e) => setFormData({ ...formData, commentaires: e.target.value })}
+              value={formData.notes}
+              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+              disabled={loading}
               rows={4}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 resize-none"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 resize-none disabled:bg-gray-100"
               placeholder="Instructions de livraison, spécifications particulières, conditions de paiement..."
             />
             <div className="mt-1 text-xs text-gray-500">
@@ -496,23 +530,34 @@ export default function AddOrderModal({
         {/* Modal Footer */}
         <div className="flex items-center justify-between px-6 py-4 bg-gray-50 border-t border-gray-200 rounded-b-xl">
           <div className="text-sm text-gray-600">
-            <span className="font-medium">Champs obligatoires :</span> Fournisseur, date d'expiration, gestionnaire et au moins un produit
+            <span className="font-medium">Champs obligatoires:</span> Fournisseur, date de livraison et au moins un article
           </div>
           
           <div className="flex space-x-3">
             <button
               onClick={handleClose}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              disabled={loading}
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Annuler
             </button>
             
             <button
               onClick={handleSave}
-              className="px-6 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2 shadow-sm"
+              disabled={loading}
+              className="px-6 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <Check className="w-4 h-4" />
-              <span>Créer le bon de commande</span>
+              {loading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Création...</span>
+                </>
+              ) : (
+                <>
+                  <Check className="w-4 h-4" />
+                  <span>Créer le bon de commande</span>
+                </>
+              )}
             </button>
           </div>
         </div>

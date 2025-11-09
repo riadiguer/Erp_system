@@ -158,11 +158,12 @@ export default function QuoteDetailPage() {
         return;
       }
       await refresh();
-    } catch (e: any) {
-      if (e?.status === 400) setErr(e?.detail || 'Invalid operation for this quote state.');
-      else if (e?.status === 401) setErr('Please sign in again.');
-      else if (e?.status === 403) setErr('You do not have permission for this action.');
-      else if (e?.status === 404) setErr('Quote not found.');
+    }catch (e) {
+      const error = e as { status?: number; detail?: string };
+      if (error?.status === 400) setErr(error?.detail || 'Invalid operation for this quote state.');
+      else if (error?.status === 401) setErr('Please sign in again.');
+      else if (error?.status === 403) setErr('You do not have permission for this action.');
+      else if (error?.status === 404) setErr('Quote not found.');
       else setErr('Something went wrong. Try again.');
     } finally {
       setBusy(null);

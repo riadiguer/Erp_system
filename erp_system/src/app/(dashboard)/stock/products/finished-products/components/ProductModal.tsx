@@ -8,7 +8,6 @@ import {
   TrendingUp,
   Calendar,
   ShoppingCart,
-  DollarSign,
   BarChart3,
   AlertCircle,
   CheckCircle,
@@ -29,7 +28,6 @@ export default function ProductModal({
   product,
   onClose,
   onEdit,
-  onDelete,
 }: ProductModalProps) {
   if (!product) return null;
 
@@ -93,7 +91,7 @@ export default function ProductModal({
 
   const salesData = [45, 52, 48, 60, 65, 70, 58, 65, 72, 68, 75, 80];
 
-  function handleDelete(event: React.MouseEvent<HTMLButtonElement>): void {
+  function handleDelete(): void {
     throw new Error("Function not implemented.");
   }
 

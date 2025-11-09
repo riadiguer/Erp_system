@@ -20,8 +20,11 @@ export default function ForgotPasswordPage() {
       setError('');
       await AuthApi.forgotPassword(data);
       setSent(true);
-    } catch (e: any) {
-      setError(e?.detail || 'Could not send reset email. Please try again.');
+    } catch (e: unknown) {
+      const errorMessage = e && typeof e === 'object' && 'detail' in e 
+        ? String(e.detail) 
+        : 'Could not send reset email. Please try again.';
+      setError(errorMessage);
     }
   };
 
@@ -44,7 +47,7 @@ export default function ForgotPasswordPage() {
               Forgot Password?
             </h1>
             <p className="text-slate-600">
-              No worries! Enter your email and we'll send you a reset link.
+              No worries! Enter your email and we&apos;ll send you a reset link.
             </p>
           </div>
 
@@ -133,7 +136,7 @@ export default function ForgotPasswordPage() {
                 <span className="font-medium">Secure Connection</span>
               </div>
               <p>Reset links are valid for 24 hours</p>
-              <p>Check your spam folder if you don't see the email</p>
+              <p>Check your spam folder if you don&apos;t see the email</p>
             </div>
           </div>
         </div>

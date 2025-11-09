@@ -46,7 +46,7 @@ export default function SupplierDetailsModal({
     tab,
     count,
   }: {
-    icon: any;
+    icon: React.ComponentType<{ className?: string }>;
     label: string;
     tab: "history" | "invoices" | "documents";
     count?: number;

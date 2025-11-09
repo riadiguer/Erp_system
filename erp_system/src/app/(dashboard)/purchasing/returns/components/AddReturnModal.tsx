@@ -2,10 +2,37 @@
 import React, { useState } from 'react'
 import { X, Plus, Check, Building, AlertTriangle, Package, RotateCcw, DollarSign } from 'lucide-react'
 
+interface Produit {
+  id: string
+  nom: string
+  type: 'produit' | 'matiere'
+  quantite: number
+  quantiteRetournee: number
+  prixUnitaire: number
+}
+
+interface ReturnFormData {
+  fournisseur: {
+    id: string
+    nom: string
+    email: string
+    telephone: string
+    adresse: string
+  }
+  motifRetour: string
+  descriptionMotif: string
+  produits: Produit[]
+  prixAchat: number
+  montantRetour: number
+  commentaires: string
+  gestionnaire: string
+  numeroCommande: string
+}
+
 interface AddReturnModalProps {
   isOpen: boolean
   onClose: () => void
-  onSave: (formData: any) => void
+  onSave: (formData: ReturnFormData) => void
   fournisseursDispo: Array<{
     id: string
     nom: string
@@ -30,18 +57,11 @@ export default function AddReturnModal({
   produitsDispo,
   motifsDispo 
 }: AddReturnModalProps) {
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<ReturnFormData>({
     fournisseur: { id: '', nom: '', email: '', telephone: '', adresse: '' },
     motifRetour: '',
     descriptionMotif: '',
-    produits: [] as Array<{
-      id: string
-      nom: string
-      type: 'produit' | 'matiere'
-      quantite: number
-      quantiteRetournee: number
-      prixUnitaire: number
-    }>,
+    produits: [],
     prixAchat: 0,
     montantRetour: 0,
     commentaires: '',
@@ -86,7 +106,7 @@ export default function AddReturnModal({
     return !Object.values(newErrors).some(error => error !== '')
   }
 
-  const calculateMontants = (produits) => {
+  const calculateMontants = (produits: Produit[]) => {
     const prixAchat = produits.reduce((total, produit) => total + (produit.quantite * produit.prixUnitaire), 0)
     const montantRetour = produits.reduce((total, produit) => total + (produit.quantiteRetournee * produit.prixUnitaire), 0)
     return { prixAchat, montantRetour }
@@ -118,7 +138,7 @@ export default function AddReturnModal({
     }
   }
 
-  const handleFournisseurChange = (fournisseurId) => {
+  const handleFournisseurChange = (fournisseurId: string) => {
     const fournisseur = fournisseursDispo.find(f => f.id === fournisseurId)
     setFormData({
       ...formData,
@@ -129,7 +149,7 @@ export default function AddReturnModal({
     }
   }
 
-  const addProduitToForm = (produit) => {
+  const addProduitToForm = (produit: AddReturnModalProps['produitsDispo'][0]) => {
     const existing = formData.produits.find(p => p.id === produit.id)
     if (existing) {
       const updatedProduits = formData.produits.map(p => 
@@ -147,7 +167,7 @@ export default function AddReturnModal({
         montantRetour
       })
     } else {
-      const updatedProduits = [...formData.produits, { 
+      const updatedProduits: Produit[] = [...formData.produits, { 
         ...produit, 
         quantite: 1,
         quantiteRetournee: 1 
@@ -165,7 +185,7 @@ export default function AddReturnModal({
     }
   }
 
-  const updateProduitQuantity = (produitId, field, newQuantite) => {
+  const updateProduitQuantity = (produitId: string, field: keyof Pick<Produit, 'quantite' | 'quantiteRetournee'>, newQuantite: number) => {
     if (newQuantite <= 0) {
       removeProduitFromForm(produitId)
     } else {
@@ -182,7 +202,7 @@ export default function AddReturnModal({
     }
   }
 
-  const updateProduitPrice = (produitId, newPrice) => {
+  const updateProduitPrice = (produitId: string, newPrice: number) => {
     const updatedProduits = formData.produits.map(p => 
       p.id === produitId ? { ...p, prixUnitaire: newPrice } : p
     )
@@ -195,7 +215,7 @@ export default function AddReturnModal({
     })
   }
 
-  const removeProduitFromForm = (produitId) => {
+  const removeProduitFromForm = (produitId: string) => {
     const updatedProduits = formData.produits.filter(p => p.id !== produitId)
     const { prixAchat, montantRetour } = calculateMontants(updatedProduits)
     setFormData({
@@ -553,7 +573,7 @@ export default function AddReturnModal({
               <div className="mt-4 bg-white p-4 rounded-lg border border-red-200">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="flex justify-between items-center">
-                    <span className="font-medium text-gray-700">Montant d'achat total:</span>
+                    <span className="font-medium text-gray-700">Montant d&apos;achat total:</span>
                     <span className="font-bold text-gray-900">{formData.prixAchat.toLocaleString()} DT</span>
                   </div>
                   <div className="flex justify-between items-center">

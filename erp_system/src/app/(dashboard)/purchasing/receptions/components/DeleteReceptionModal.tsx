@@ -1,6 +1,6 @@
 'use client'
 import React from 'react'
-import { X, Trash2, AlertTriangle, Building, Package, Calendar, DollarSign, User, Truck } from 'lucide-react'
+import { X, Trash2, AlertTriangle, Package, Calendar, DollarSign, User, Truck } from 'lucide-react'
 
 interface DeleteReceptionModalProps {
   isOpen: boolean
@@ -283,7 +283,7 @@ export default function DeleteReceptionModal({
             <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
               <h5 className="font-semibold text-gray-900 mb-2">Commentaires qui seront perdus :</h5>
               <p className="text-sm text-gray-700 italic bg-white p-3 rounded border-l-4 border-gray-400">
-                "{reception.commentairesReception}"
+                &ldquo;{reception.commentairesReception}&rdquo;
               </p>
             </div>
           )}
@@ -315,7 +315,7 @@ export default function DeleteReceptionModal({
                   <li>La réception {reception.numeroReception} sera définitivement supprimée</li>
                   <li>{reception.produits.length} article{reception.produits.length > 1 ? 's' : ''} et {getTotalQuantiteRecue()} unité{getTotalQuantiteRecue() > 1 ? 's' : ''} reçue{getTotalQuantiteRecue() > 1 ? 's' : ''} seront perdu{getTotalQuantiteRecue() > 1 ? 'es' : 'e'}</li>
                   <li>Le montant de {reception.montantTotal.toLocaleString()} DT ne sera plus tracé</li>
-                  <li>L'historique de réception du bon {reception.bonCommande.numeroBon} sera effacé</li>
+                  <li>L&apos;historique de réception du bon {reception.bonCommande.numeroBon} sera effacé</li>
                   <li>Les informations de traçabilité (transporteur, bon de livraison) seront perdues</li>
                   <li>Les commentaires et observations de réception seront supprimés</li>
                   <li>Cette action ne pourra pas être annulée</li>

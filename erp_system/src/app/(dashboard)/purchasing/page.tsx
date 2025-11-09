@@ -1,7 +1,5 @@
-'use client';
-
-import Link from 'next/link';
-import { useEffect, useState } from 'react';
+'use client'
+import Link from 'next/link'
 import { 
   ShoppingCart, 
   FileText, 
@@ -10,22 +8,19 @@ import {
   RotateCcw, 
   CreditCard,
   TrendingUp,
-  Activity,
-  Loader2
-} from 'lucide-react';
-import { PurchaseOrderApi, getDemandStatistics } from './store';
+  Activity
+} from 'lucide-react'
 
 interface ModuleCardProps {
-  href: string;
-  icon: React.ReactNode;
-  title: string;
-  description: string;
-  color: string;
-  bgGradient: string;
-  badge?: string | number;
+  href: string
+  icon: React.ReactNode
+  title: string
+  description: string
+  color: string
+  bgGradient: string
 }
 
-const ModuleCard = ({ href, icon, title, description, color, bgGradient, badge }: ModuleCardProps) => (
+const ModuleCard = ({ href, icon, title, description, color, bgGradient }: ModuleCardProps) => (
   <Link href={href} className="group block">
     <div className={`relative p-6 rounded-xl border border-gray-200 bg-gradient-to-br ${bgGradient} hover:shadow-xl hover:scale-105 transition-all duration-300 overflow-hidden`}>
       {/* Background pattern */}
@@ -34,15 +29,8 @@ const ModuleCard = ({ href, icon, title, description, color, bgGradient, badge }
       </div>
       
       <div className="relative z-10">
-        <div className="flex items-start justify-between mb-4">
-          <div className={`inline-flex items-center justify-center w-12 h-12 rounded-lg ${color} group-hover:scale-110 transition-transform duration-300`}>
-            {icon}
-          </div>
-          {badge !== undefined && (
-            <span className="px-2.5 py-1 bg-white rounded-full text-xs font-bold text-gray-700 shadow-sm">
-              {badge}
-            </span>
-          )}
+        <div className={`inline-flex items-center justify-center w-12 h-12 rounded-lg ${color} mb-4 group-hover:scale-110 transition-transform duration-300`}>
+          {icon}
         </div>
         
         <h3 className="text-lg font-semibold text-gray-900 mb-2 group-hover:text-blue-600 transition-colors">
@@ -63,17 +51,16 @@ const ModuleCard = ({ href, icon, title, description, color, bgGradient, badge }
       </div>
     </div>
   </Link>
-);
+)
 
-const StatCard = ({ icon, title, value, change, changeType, loading }: {
-  icon: React.ReactNode;
-  title: string;
-  value: string;
-  change?: string;
-  changeType?: 'positive' | 'negative';
-  loading?: boolean;
+const StatCard = ({ icon, title, value, change, changeType }: {
+  icon: React.ReactNode
+  title: string
+  value: string
+  change: string
+  changeType: 'positive' | 'negative'
 }) => (
-  <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow duration-200">
+  <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
     <div className="flex items-center justify-between">
       <div className="flex items-center space-x-3">
         <div className="p-2 bg-blue-50 rounded-lg">
@@ -81,92 +68,26 @@ const StatCard = ({ icon, title, value, change, changeType, loading }: {
         </div>
         <div>
           <p className="text-sm font-medium text-gray-600">{title}</p>
-          {loading ? (
-            <div className="flex items-center space-x-2 mt-1">
-              <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
-              <span className="text-sm text-gray-400">Chargement...</span>
-            </div>
-          ) : (
-            <p className="text-2xl font-bold text-gray-900">{value}</p>
-          )}
+          <p className="text-2xl font-bold text-gray-900">{value}</p>
         </div>
       </div>
-      {change && changeType && !loading && (
-        <div className={`flex items-center space-x-1 text-sm ${changeType === 'positive' ? 'text-green-600' : 'text-red-600'}`}>
-          <TrendingUp className={`w-4 h-4 ${changeType === 'negative' ? 'rotate-180' : ''}`} />
-          <span>{change}</span>
-        </div>
-      )}
+      <div className={`flex items-center space-x-1 text-sm ${changeType === 'positive' ? 'text-green-600' : 'text-red-600'}`}>
+        <TrendingUp className="w-4 h-4" />
+        <span>{change}</span>
+      </div>
     </div>
   </div>
-);
+)
 
 export default function PurchasingDashboard() {
-  const [stats, setStats] = useState({
-    totalOrders: 0,
-    pendingOrders: 0,
-    pendingReceptions: 0,
-    totalAmount: 0,
-    demands: {
-      total: 0,
-      soumise: 0,
-      approuvee: 0,
-    }
-  });
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    async function fetchStats() {
-      try {
-        setLoading(true);
-        
-        // Get purchase order statistics from backend
-        const orderStats = await PurchaseOrderApi.statistics();
-        
-        // Get demand statistics from localStorage
-        const demandStats = getDemandStatistics();
-        
-        // Calculate pending receptions (sent + confirmed orders)
-        const pendingReceptions = orderStats.pending_orders || 0;
-        
-        setStats({
-          totalOrders: orderStats.total_orders || 0,
-          pendingOrders: orderStats.pending_orders || 0,
-          pendingReceptions,
-          totalAmount: orderStats.total_amount || 0,
-          demands: {
-            total: demandStats.total,
-            soumise: demandStats.soumise,
-            approuvee: demandStats.approuvee,
-          }
-        });
-      } catch (error) {
-        console.error('Error fetching statistics:', error);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchStats();
-  }, []);
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('fr-DZ', {
-      style: 'decimal',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
-    }).format(amount) + ' DA';
-  };
-
-  const modules = [
+    const modules = [
     {
       href: "./purchasing/demand-requests",
       icon: <ShoppingCart className="w-6 h-6 text-white" />,
       title: "Demandes d'achat",
       description: "Gérez les demandes d'achat internes et suivez leur statut d'approbation",
       color: "bg-blue-500",
-      bgGradient: "from-blue-50 to-blue-100",
-      badge: stats.demands.soumise > 0 ? stats.demands.soumise : undefined
+      bgGradient: "from-blue-50 to-blue-100"
     },
     {
       href: "./purchasing/orders",
@@ -174,8 +95,7 @@ export default function PurchasingDashboard() {
       title: "Bons de commande",
       description: "Créez et suivez vos bons de commande auprès des fournisseurs",
       color: "bg-green-500",
-      bgGradient: "from-green-50 to-green-100",
-      badge: stats.totalOrders > 0 ? stats.totalOrders : undefined
+      bgGradient: "from-green-50 to-green-100"
     },
     {
       href: "./purchasing/receptions",
@@ -183,8 +103,7 @@ export default function PurchasingDashboard() {
       title: "Réceptions",
       description: "Enregistrez les réceptions de marchandises et vérifiez la conformité",
       color: "bg-purple-500",
-      bgGradient: "from-purple-50 to-purple-100",
-      badge: stats.pendingReceptions > 0 ? stats.pendingReceptions : undefined
+      bgGradient: "from-purple-50 to-purple-100"
     },
     {
       href: "./purchasing/invoices",
@@ -210,7 +129,7 @@ export default function PurchasingDashboard() {
       color: "bg-indigo-500",
       bgGradient: "from-indigo-50 to-indigo-100"
     }
-  ];
+  ]
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
@@ -224,7 +143,7 @@ export default function PurchasingDashboard() {
             <h1 className="text-4xl font-bold text-gray-900">Module Achats</h1>
           </div>
           <p className="text-lg text-gray-600">
-            Gérez l'ensemble de votre processus d'achat, de la demande au paiement
+            Gérez l&apos;ensemble de votre processus d&apos;achat, de la demande au paiement
           </p>
         </div>
 
@@ -232,35 +151,31 @@ export default function PurchasingDashboard() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <StatCard 
             icon={<FileText className="w-5 h-5 text-blue-600" />}
-            title="Commandes actives"
-            value={stats.pendingOrders.toString()}
-            change={stats.totalOrders > 0 ? `${stats.totalOrders} total` : undefined}
+            title="Commandes en cours"
+            value="24"
+            change="+12%"
             changeType="positive"
-            loading={loading}
           />
           <StatCard 
             icon={<Package className="w-5 h-5 text-blue-600" />}
             title="En attente réception"
-            value={stats.pendingReceptions.toString()}
-            change={stats.pendingReceptions > 0 ? "À recevoir" : "Aucune"}
-            changeType={stats.pendingReceptions > 0 ? "negative" : "positive"}
-            loading={loading}
+            value="8"
+            change="-5%"
+            changeType="negative"
           />
           <StatCard 
-            icon={<ShoppingCart className="w-5 h-5 text-blue-600" />}
-            title="Demandes en attente"
-            value={stats.demands.soumise.toString()}
-            change={stats.demands.approuvee > 0 ? `${stats.demands.approuvee} approuvées` : undefined}
+            icon={<Receipt className="w-5 h-5 text-blue-600" />}
+            title="Factures à traiter"
+            value="12"
+            change="+8%"
             changeType="positive"
-            loading={loading}
           />
           <StatCard 
             icon={<Activity className="w-5 h-5 text-blue-600" />}
-            title="Montant total"
-            value={loading ? "..." : formatCurrency(stats.totalAmount)}
-            change={stats.totalOrders > 0 ? "Commandes" : undefined}
+            title="Montant mensuel"
+            value="€45,320"
+            change="+15%"
             changeType="positive"
-            loading={loading}
           />
         </div>
 
@@ -271,39 +186,10 @@ export default function PurchasingDashboard() {
           ))}
         </div>
 
-        {/* Info Footer */}
-        {!loading && stats.totalOrders === 0 && (
-          <div className="mt-8 p-6 bg-blue-50 border border-blue-200 rounded-xl">
-            <div className="flex items-start space-x-3">
-              <div className="flex-shrink-0">
-                <FileText className="w-6 h-6 text-blue-600" />
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold text-blue-900 mb-1">
-                  Commencez par créer votre première commande
-                </h3>
-                <p className="text-sm text-blue-700 mb-4">
-                  Aucune commande d'achat n'a encore été créée. Commencez par créer une demande d'achat ou directement un bon de commande.
-                </p>
-                <div className="flex space-x-3">
-                  <Link 
-                    href="./purchasing/demand-requests"
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors"
-                  >
-                    Créer une demande
-                  </Link>
-                  <Link 
-                    href="./purchasing/orders"
-                    className="px-4 py-2 bg-white text-blue-600 border border-blue-600 rounded-lg text-sm font-semibold hover:bg-blue-50 transition-colors"
-                  >
-                    Créer un bon de commande
-                  </Link>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+        {/* Quick Actions */}
+
+       
       </div>
     </div>
-  );
+  )
 }

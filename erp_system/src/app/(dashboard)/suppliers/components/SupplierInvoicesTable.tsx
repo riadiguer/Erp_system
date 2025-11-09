@@ -2,8 +2,22 @@
 
 import { FileText, CreditCard, Download, Eye, AlertCircle, CheckCircle, Clock } from "lucide-react";
 
+interface Invoice {
+  id: number;
+  number: string;
+  date: string;
+  dueDate: string;
+  total: number;
+  paid: number;
+  status: string;
+}
+
+interface Supplier {
+  invoices?: Invoice[];
+}
+
 interface SupplierInvoicesTableProps {
-  supplier?: any;
+  supplier?: Supplier;
 }
 
 export default function SupplierInvoicesTable({ supplier }: SupplierInvoicesTableProps) {
@@ -38,7 +52,12 @@ export default function SupplierInvoicesTable({ supplier }: SupplierInvoicesTabl
   ];
 
   const StatusBadge = ({ status }: { status: string }) => {
-    const configs: any = {
+    const configs: Record<string, {
+      icon: React.ComponentType<{ className?: string }>;
+      bg: string;
+      text: string;
+      border: string;
+    }> = {
       "Payée": {
         icon: CheckCircle,
         bg: "bg-green-100",
@@ -156,7 +175,7 @@ export default function SupplierInvoicesTable({ supplier }: SupplierInvoicesTabl
           </thead>
 
           <tbody className="bg-white divide-y divide-gray-100">
-            {invoices.map((inv, index) => (
+            {invoices.map((inv) => (
               <tr key={inv.id} className="hover:bg-blue-50/30 transition-colors duration-150 group">
                 <td className="px-6 py-4">
                   <div className="flex items-center space-x-3">

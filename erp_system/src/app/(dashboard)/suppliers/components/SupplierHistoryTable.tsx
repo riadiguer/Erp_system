@@ -1,7 +1,20 @@
 "use client";
 
-import { FileText, Eye, Download, Calendar, MapPin, DollarSign, CheckCircle, Clock, AlertCircle, XCircle, Loader2 } from "lucide-react";
-import { Supplier, PurchaseOrder } from "@/lib/features/warehouse/types";
+import {
+  FileText,
+  Eye,
+  Download,
+  Calendar,
+  MapPin,
+  DollarSign,
+  CheckCircle,
+  Clock,
+  AlertCircle,
+  XCircle,
+  Loader2,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import type { Supplier /*, PurchaseOrder*/ } from "@/lib/features/warehouse/types";
 import { usePurchaseOrders } from "@/lib/features/warehouse/hooks";
 import { useMemo } from "react";
 
@@ -9,60 +22,73 @@ interface SupplierHistoryTableProps {
   supplier?: Supplier | null;
 }
 
+// If you want to keep PurchaseOrder imported, you can uncomment this
+// type Order = PurchaseOrder;
+type PurchaseStatus = "draft" | "sent" | "confirmed" | "received" | "cancelled";
+
 export default function SupplierHistoryTable({ supplier }: SupplierHistoryTableProps) {
   const { orders, loading } = usePurchaseOrders();
 
   // Filter orders for this supplier
   const supplierOrders = useMemo(() => {
     if (!supplier?.id) return [];
-    return orders.filter(order => order.supplier === supplier.id);
+    return orders.filter((order) => order.supplier === supplier.id);
   }, [orders, supplier?.id]);
 
-  const StatusBadge = ({ status }: { status: string }) => {
-    const statusConfig: Record<string, {
-      icon: any;
-      color: string;
-      dotColor: string;
-      label: string;
-    }> = {
-      "draft": {
+  const StatusBadge = ({ status }: { status: PurchaseStatus }) => {
+    const statusConfig: Record<
+      PurchaseStatus,
+      {
+        icon: LucideIcon;
+        color: string;
+        dotColor: string;
+        label: string;
+      }
+    > = {
+      draft: {
         icon: AlertCircle,
         color: "bg-gray-100 text-gray-700 border-gray-200",
         dotColor: "bg-gray-500",
-        label: "Brouillon"
+        label: "Brouillon",
       },
-      "sent": {
+      sent: {
         icon: Clock,
         color: "bg-blue-100 text-blue-700 border-blue-200",
         dotColor: "bg-blue-500",
-        label: "Envoyé"
+        label: "Envoyé",
       },
-      "confirmed": {
+      confirmed: {
         icon: CheckCircle,
         color: "bg-purple-100 text-purple-700 border-purple-200",
         dotColor: "bg-purple-500",
-        label: "Confirmé"
+        label: "Confirmé",
       },
-      "received": {
+      received: {
         icon: CheckCircle,
         color: "bg-green-100 text-green-700 border-green-200",
         dotColor: "bg-green-500",
-        label: "Reçu"
+        label: "Reçu",
       },
-      "cancelled": {
+      cancelled: {
         icon: XCircle,
         color: "bg-red-100 text-red-700 border-red-200",
         dotColor: "bg-red-500",
-        label: "Annulé"
-      }
+        label: "Annulé",
+      },
     };
 
-    const config = statusConfig[status] || statusConfig["draft"];
+    const config = statusConfig[status] ?? statusConfig.draft;
     const Icon = config.icon;
 
     return (
-      <div className={`inline-flex items-center space-x-2 px-3 py-1.5 rounded-lg border font-semibold text-xs ${config.color}`}>
-        <div className={`w-2 h-2 rounded-full ${config.dotColor} ${status !== 'cancelled' ? 'animate-pulse' : ''}`}></div>
+      <div
+        className={`inline-flex items-center space-x-2 px-3 py-1.5 rounded-lg border font-semibold text-xs ${config.color}`}
+      >
+        <div
+          className={`w-2 h-2 rounded-full ${config.dotColor} ${
+            status !== "cancelled" ? "animate-pulse" : ""
+          }`}
+        />
         <Icon className="w-3.5 h-3.5" />
         <span>{config.label}</span>
       </div>
@@ -71,10 +97,13 @@ export default function SupplierHistoryTable({ supplier }: SupplierHistoryTableP
 
   // Calculate totals
   const stats = useMemo(() => {
-    const total = supplierOrders.reduce((sum, order) => sum + parseFloat(order.total_amount || '0'), 0);
-    const received = supplierOrders.filter(o => o.status === 'received').length;
-    const pending = supplierOrders.filter(o => ['sent', 'confirmed'].includes(o.status)).length;
-    
+    const total = supplierOrders.reduce(
+      (sum, order) => sum + parseFloat((order.total_amount as string) || "0"),
+      0
+    );
+    const received = supplierOrders.filter((o) => o.status === "received").length;
+    const pending = supplierOrders.filter((o) => ["sent", "confirmed"].includes(o.status)).length;
+
     return { total, received, pending };
   }, [supplierOrders]);
 
@@ -84,7 +113,7 @@ export default function SupplierHistoryTable({ supplier }: SupplierHistoryTableP
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
             <Loader2 className="w-8 h-8 text-blue-600 animate-spin mx-auto mb-2" />
-            <p className="text-sm text-gray-600">Chargement de l'historique...</p>
+            <p className="text-sm text-gray-600">Chargement de l&apos;historique...</p>
           </div>
         </div>
       </div>
@@ -108,7 +137,9 @@ export default function SupplierHistoryTable({ supplier }: SupplierHistoryTableP
           <div className="text-center">
             <FileText className="w-12 h-12 text-gray-300 mx-auto mb-3" />
             <p className="text-gray-500 font-medium">Aucun bon de commande</p>
-            <p className="text-sm text-gray-400 mt-1">Ce fournisseur n'a pas encore de commandes</p>
+            <p className="text-sm text-gray-400 mt-1">
+              Ce fournisseur n&apos;a pas encore de commandes
+            </p>
           </div>
         </div>
       </div>
@@ -148,8 +179,8 @@ export default function SupplierHistoryTable({ supplier }: SupplierHistoryTableP
 
           <tbody className="bg-white divide-y divide-gray-100">
             {supplierOrders.map((order, index) => (
-              <tr 
-                key={order.id} 
+              <tr
+                key={order.id}
                 className="hover:bg-blue-50/50 transition-colors duration-200 group"
               >
                 <td className="px-6 py-4 whitespace-nowrap">
@@ -168,7 +199,8 @@ export default function SupplierHistoryTable({ supplier }: SupplierHistoryTableP
                     <div>
                       <p className="text-sm font-bold text-gray-900">{order.order_number}</p>
                       <p className="text-xs text-gray-500">
-                        {order.items_count || 0} article{(order.items_count || 0) > 1 ? 's' : ''}
+                        {(order.items_count || 0)} article
+                        {(order.items_count || 0) > 1 ? "s" : ""}
                       </p>
                     </div>
                   </div>
@@ -178,7 +210,7 @@ export default function SupplierHistoryTable({ supplier }: SupplierHistoryTableP
                   <div className="flex items-center space-x-2 text-sm text-gray-700">
                     <Calendar className="w-4 h-4 text-gray-400" />
                     <span className="font-medium">
-                      {new Date(order.order_date).toLocaleDateString('fr-FR')}
+                      {new Date(order.order_date).toLocaleDateString("fr-FR")}
                     </span>
                   </div>
                 </td>
@@ -189,7 +221,7 @@ export default function SupplierHistoryTable({ supplier }: SupplierHistoryTableP
                       <>
                         <MapPin className="w-4 h-4 text-purple-500" />
                         <span className="text-sm font-medium text-gray-700">
-                          {new Date(order.expected_delivery_date).toLocaleDateString('fr-FR')}
+                          {new Date(order.expected_delivery_date).toLocaleDateString("fr-FR")}
                         </span>
                       </>
                     ) : (
@@ -202,16 +234,17 @@ export default function SupplierHistoryTable({ supplier }: SupplierHistoryTableP
                   <div className="flex items-center space-x-2">
                     <DollarSign className="w-4 h-4 text-green-600" />
                     <span className="text-sm font-bold text-gray-900">
-                      {parseFloat(order.total_amount || '0').toLocaleString('fr-FR', {
+                      {parseFloat((order.total_amount as string) || "0").toLocaleString("fr-FR", {
                         minimumFractionDigits: 2,
-                        maximumFractionDigits: 2
-                      })} DA
+                        maximumFractionDigits: 2,
+                      })}{" "}
+                      DA
                     </span>
                   </div>
                 </td>
 
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <StatusBadge status={order.status} />
+                  <StatusBadge status={order.status as PurchaseStatus} />
                 </td>
 
                 <td className="px-6 py-4 whitespace-nowrap">
@@ -220,8 +253,7 @@ export default function SupplierHistoryTable({ supplier }: SupplierHistoryTableP
                       className="p-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-all duration-200 hover:scale-110"
                       title="Voir détails"
                       onClick={() => {
-                        // TODO: Open order details modal
-                        console.log('View order:', order.id);
+                        console.log("View order:", order.id);
                       }}
                     >
                       <Eye className="w-4 h-4" />
@@ -230,8 +262,7 @@ export default function SupplierHistoryTable({ supplier }: SupplierHistoryTableP
                       className="p-2 rounded-lg bg-green-50 text-green-600 hover:bg-green-100 transition-all duration-200 hover:scale-110"
                       title="Télécharger PDF"
                       onClick={() => {
-                        // TODO: Generate and download PDF
-                        console.log('Download order:', order.id);
+                        console.log("Download order:", order.id);
                       }}
                     >
                       <Download className="w-4 h-4" />
@@ -249,30 +280,31 @@ export default function SupplierHistoryTable({ supplier }: SupplierHistoryTableP
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-6">
             <div className="flex items-center space-x-2">
-              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+              <div className="w-2 h-2 bg-green-500 rounded-full" />
               <span className="text-sm font-semibold text-gray-700">
-                {stats.received} Reçue{stats.received > 1 ? 's' : ''}
+                {stats.received} Reçue{stats.received > 1 ? "s" : ""}
               </span>
             </div>
             <div className="flex items-center space-x-2">
-              <div className="w-2 h-2 bg-amber-500 rounded-full"></div>
-              <span className="text-sm font-semibold text-gray-700">
-                {stats.pending} En attente
-              </span>
+              <div className="w-2 h-2 bg-amber-500 rounded-full" />
+              <span className="text-sm font-semibold text-gray-700">{stats.pending} En attente</span>
             </div>
             <div className="flex items-center space-x-2">
               <DollarSign className="w-4 h-4 text-gray-600" />
               <span className="text-sm font-bold text-gray-900">
-                Total: {stats.total.toLocaleString('fr-FR', {
+                Total:{" "}
+                {stats.total.toLocaleString("fr-FR", {
                   minimumFractionDigits: 2,
-                  maximumFractionDigits: 2
-                })} DA
+                  maximumFractionDigits: 2,
+                })}{" "}
+                DA
               </span>
             </div>
           </div>
 
           <div className="text-sm text-gray-600">
-            <span className="font-semibold">{supplierOrders.length}</span> commande{supplierOrders.length > 1 ? 's' : ''} au total
+            <span className="font-semibold">{supplierOrders.length}</span> commande
+            {supplierOrders.length > 1 ? "s" : ""} au total
           </div>
         </div>
       </div>

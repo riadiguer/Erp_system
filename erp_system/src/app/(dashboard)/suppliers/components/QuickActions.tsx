@@ -1,14 +1,26 @@
 "use client";
 
-import { Eye, Pencil, Trash2, CreditCard, FileText } from "lucide-react";
+import { Eye, Pencil, Trash2, CreditCard, FileText, LucideIcon } from "lucide-react";
 
+// --- 1. Define the Supplier Type ---
+// You should replace this with the actual structure of your supplier object.
+// I've added a few common properties as examples.
+interface SupplierType {
+  id: string | number;
+  name: string;
+  phone?: string;
+  email?: string;
+  // ... any other supplier properties
+}
+
+// --- 2. Type the QuickActions Props ---
 interface QuickActionsProps {
-  supplier: any;
-  onViewDetails: (supplier: any) => void;
-  onEdit: (supplier: any) => void;
-  onDelete: (supplier: any) => void;
-  onPayment: (supplier: any) => void;
-  onOrder: (supplier: any) => void;
+  supplier: SupplierType; // Use the specific type
+  onViewDetails: (supplier: SupplierType) => void;
+  onEdit: (supplier: SupplierType) => void;
+  onDelete: (supplier: SupplierType) => void;
+  onPayment: (supplier: SupplierType) => void;
+  onOrder: (supplier: SupplierType) => void;
 }
 
 export default function QuickActions({
@@ -20,6 +32,8 @@ export default function QuickActions({
   onOrder,
 }: QuickActionsProps) {
   
+  // --- 3. Type the ActionButton Props ---
+  // The icons (Eye, Pencil, etc.) imported from 'lucide-react' are of type LucideIcon
   const ActionButton = ({ 
     icon: Icon, 
     onClick, 
@@ -27,7 +41,7 @@ export default function QuickActions({
     color,
     hoverColor 
   }: {
-    icon: any;
+    icon: LucideIcon; // Use the correct type for the icon component
     onClick: () => void;
     title: string;
     color: string;

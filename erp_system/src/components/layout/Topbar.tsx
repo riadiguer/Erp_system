@@ -88,8 +88,9 @@ export function Topbar() {
                   <div className="py-2">
                     <button
                       onClick={() => {
+                        console.log('Navigating to profile...');
                         setShowUserMenu(false);
-                        // Add profile navigation here
+                        router.push('/profile');
                       }}
                       className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
                     >

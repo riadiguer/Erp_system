@@ -9,11 +9,7 @@ import {
   Trash2, 
   Package, 
   ArrowLeft,
-  AlertTriangle,
-  User,
-  Calendar,
   Building,
-  Clock,
   MoreHorizontal,
   CheckCircle,
   XCircle,
@@ -26,15 +22,64 @@ import ViewReceptionModal from './components/ViewReceptionModal'
 import EditReceptionModal from './components/EditReceptionModal'
 import DeleteReceptionModal from './components/DeleteReceptionModal'
 
+// Types
+interface Produit {
+  id: string
+  nom: string
+  quantiteCommandee: number
+  quantiteRecue: number
+  etat: string
+  prixUnitaire: number
+  commentaire: string
+}
+
+interface Reception {
+  id: string
+  numeroReception: string
+  bonCommande: {
+    id: string
+    numeroBon: string
+    fournisseur: { 
+      id: string
+      nom: string
+      email: string
+    }
+  }
+  dateReception: string
+  heureReception: string
+  receptionnePar: string
+  numeroBonLivraison: string
+  transporteur: string
+  etatLivraison: string
+  produits: Produit[]
+  commentairesReception: string
+  montantTotal: number
+  statut: string
+}
+
+interface Fournisseur {
+  id: string
+  nom: string
+  email: string
+  telephone: string
+}
+
+interface BonCommande {
+  id: string
+  numeroBon: string
+  fournisseur: string
+  montant: number
+}
+
 export default function ReceptionsPage() {
   const [showModal, setShowModal] = useState(false)
   const [modalType, setModalType] = useState('')
-  const [selectedItem, setSelectedItem] = useState(null)
+  const [selectedItem, setSelectedItem] = useState<Reception | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
-  const [showMobileMenu, setShowMobileMenu] = useState({})
+  const [showMobileMenu, setShowMobileMenu] = useState<Record<string, boolean>>({})
   
   // Données d'exemple pour les réceptions
-  const [receptions, setReceptions] = useState([
+  const [receptions, setReceptions] = useState<Reception[]>([
     {
       id: 'REC001',
       numeroReception: 'REC-2024-001',
@@ -163,7 +208,7 @@ export default function ReceptionsPage() {
     }
   ])
 
-  const [fournisseursDispo] = useState([
+  const [fournisseursDispo] = useState<Fournisseur[]>([
     { 
       id: 'F001', 
       nom: 'TechSupply SARL',
@@ -184,13 +229,13 @@ export default function ReceptionsPage() {
     }
   ])
 
-  const [bonsCommandeDispo] = useState([
+  const [bonsCommandeDispo] = useState<BonCommande[]>([
     { id: 'BC001', numeroBon: 'BC-2024-001', fournisseur: 'TechSupply SARL', montant: 5150 },
     { id: 'BC002', numeroBon: 'BC-2024-002', fournisseur: 'Office Plus', montant: 1025 },
     { id: 'BC004', numeroBon: 'BC-2024-004', fournisseur: 'TechSupply SARL', montant: 1350 }
   ])
 
-  const openModal = (type, item = null) => {
+  const openModal = (type: string, item: Reception | null = null) => {
     setModalType(type)
     setSelectedItem(item)
     setShowModal(true)
@@ -203,20 +248,29 @@ export default function ReceptionsPage() {
     setSelectedItem(null)
   }
 
-  const handleAddReception = (formData) => {
-    const newReception = {
+  const handleAddReception = (formData: Partial<Reception> & { produits: Produit[] }) => {
+    const newReception: Reception = {
       id: `REC${String(receptions.length + 1).padStart(3, '0')}`,
       numeroReception: `REC-2024-${String(receptions.length + 1).padStart(3, '0')}`,
-      ...formData,
+      bonCommande: formData.bonCommande || { id: '', numeroBon: '', fournisseur: { id: '', nom: '', email: '' } },
+      dateReception: formData.dateReception || '',
+      heureReception: formData.heureReception || '',
+      receptionnePar: formData.receptionnePar || '',
+      numeroBonLivraison: formData.numeroBonLivraison || '',
+      transporteur: formData.transporteur || '',
+      etatLivraison: formData.etatLivraison || '',
+      produits: formData.produits || [],
+      commentairesReception: formData.commentairesReception || '',
+      montantTotal: formData.montantTotal || 0,
       statut: determineStatut(formData.produits)
     }
     setReceptions([...receptions, newReception])
     closeModal()
   }
 
-  const handleEditReception = (formData) => {
+  const handleEditReception = (formData: Partial<Reception> & { produits: Produit[] }) => {
     setReceptions(receptions.map(r => 
-      r.id === selectedItem.id ? { 
+      r.id === selectedItem?.id ? { 
         ...r, 
         ...formData, 
         statut: determineStatut(formData.produits) 
@@ -225,12 +279,12 @@ export default function ReceptionsPage() {
     closeModal()
   }
 
-  const handleDeleteReception = (id) => {
+  const handleDeleteReception = (id: string) => {
     setReceptions(receptions.filter(r => r.id !== id))
     closeModal()
   }
 
-  const determineStatut = (produits) => {
+  const determineStatut = (produits: Produit[]): string => {
     const hasProblems = produits.some(p => p.etat === 'Manquant' || p.etat === 'Endommagé' || p.etat === 'Partiel')
     return hasProblems ? 'Problème' : 'Réceptionné'
   }
@@ -243,7 +297,7 @@ export default function ReceptionsPage() {
     reception.statut.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
-  const getEtatColor = (etat) => {
+  const getEtatColor = (etat: string) => {
     switch (etat) {
       case 'Conforme': return 'text-green-700 bg-green-100 border-green-200'
       case 'Partiellement conforme': return 'text-orange-700 bg-orange-100 border-orange-200'
@@ -253,7 +307,7 @@ export default function ReceptionsPage() {
     }
   }
 
-  const getStatutColor = (statut) => {
+  const getStatutColor = (statut: string) => {
     switch (statut) {
       case 'Réceptionné': return 'text-green-700 bg-green-100 border-green-200'
       case 'Problème': return 'text-red-700 bg-red-100 border-red-200'
@@ -272,7 +326,7 @@ export default function ReceptionsPage() {
     )
   }
 
-  const toggleMobileMenu = (id) => {
+  const toggleMobileMenu = (id: string) => {
     setShowMobileMenu(prev => ({
       ...prev,
       [id]: !prev[id]

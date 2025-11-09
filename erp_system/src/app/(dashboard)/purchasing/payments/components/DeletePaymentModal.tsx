@@ -196,7 +196,7 @@ export default function DeletePaymentModal({
                   <div>
                     <div className="flex items-center text-sm text-gray-600 mb-1">
                       <Calendar className="w-4 h-4 mr-2" />
-                      Date d'échéance
+                      Date d&apos;échéance
                     </div>
                     <div className={`text-base font-semibold ${isOverdue() ? 'text-red-600' : 'text-gray-900'}`}>
                       {formatDate(paiement.dateEcheance)}
@@ -277,7 +277,7 @@ export default function DeletePaymentModal({
             <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
               <h5 className="font-semibold text-gray-900 mb-2">Commentaires qui seront perdus :</h5>
               <p className="text-sm text-gray-700 italic bg-white p-3 rounded border-l-4 border-gray-400">
-                "{paiement.commentaires}"
+                &ldquo;{paiement.commentaires}&rdquo;
               </p>
             </div>
           )}
@@ -296,7 +296,7 @@ export default function DeletePaymentModal({
                       {paiement.montantPaye.toLocaleString()} DT repasseront en dette impayée
                     </li>
                   )}
-                  <li>L'historique des transactions avec {paiement.fournisseur.nom} sera impacté</li>
+                  <li>L&apos;historique des transactions avec {paiement.fournisseur.nom} sera impacté</li>
                   <li>Les informations de {paiement.gestionnaire} seront perdues</li>
                   <li>Cette action ne pourra pas être annulée</li>
                 </ul>

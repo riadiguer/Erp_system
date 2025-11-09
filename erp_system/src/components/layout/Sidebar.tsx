@@ -18,7 +18,6 @@ import {
   BarChart3,
   FileText,
   Cog,
-  HelpCircle
 } from 'lucide-react';
 import { useState } from 'react';
 import { MENU, type MenuItem } from './menu';

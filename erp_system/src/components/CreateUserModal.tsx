@@ -1,17 +1,35 @@
 import { useState } from 'react'
-import { X, User, Mail, Phone, Lock, Shield, Globe } from 'lucide-react'
+import { X, User, Mail, Lock, Shield } from 'lucide-react'
 
-export default function CreateUserModal({ open, onClose, onCreate }: { open: boolean, onClose: () => void, onCreate: (user: any) => void }) {
-  const [form, setForm] = useState({
+interface UserFormData {
+  username: string
+  email: string
+  first_name: string
+  last_name: string
+  password: string
+  role: string
+}
+
+export default function CreateUserModal({ 
+  open, 
+  onClose, 
+  onCreate 
+}: { 
+  open: boolean
+  onClose: () => void
+  onCreate: (user: UserFormData) => void | Promise<void>
+}) {
+  const [form, setForm] = useState<UserFormData>({
     username: '', 
-    email: '', 
-    phone: '', 
+    email: '',
+    first_name: '',
+    last_name: '',
     password: '', 
-    roles: [], 
-    sites: []
+    role: '',
   })
 
   const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target
@@ -20,24 +38,35 @@ export default function CreateUserModal({ open, onClose, onCreate }: { open: boo
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setError(null)
     setIsLoading(true)
     
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    
-    onCreate(form)
-    setIsLoading(false)
-    onClose()
-    
-    // Reset form
-    setForm({
-      username: '', 
-      email: '', 
-      phone: '', 
-      password: '', 
-      roles: [], 
-      sites: []
-    })
+    try {
+      // Validate required fields
+      if (!form.username || !form.email || !form.password || !form.role) {
+        throw new Error('Tous les champs obligatoires doivent être remplis')
+      }
+
+      // Call parent onCreate (which will call the API)
+      await onCreate(form)
+      
+      // Reset form on success
+      setForm({
+        username: '', 
+        email: '',
+        first_name: '',
+        last_name: '',
+        password: '', 
+        role: '',
+      })
+      
+      onClose()
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Une erreur est survenue'
+      setError(errorMessage)
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   if (!open) return null
@@ -65,12 +94,19 @@ export default function CreateUserModal({ open, onClose, onCreate }: { open: boo
         </div>
 
         {/* Form */}
-        <div className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          {/* Error Message */}
+          {error && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+              {error}
+            </div>
+          )}
+
           {/* Username */}
           <div className="space-y-1">
             <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
               <User className="w-4 h-4" />
-              Nom d'utilisateur
+              Nom d&apos;utilisateur *
             </label>
             <input 
               name="username" 
@@ -82,11 +118,41 @@ export default function CreateUserModal({ open, onClose, onCreate }: { open: boo
             />
           </div>
 
+          {/* First Name */}
+          <div className="space-y-1">
+            <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+              <User className="w-4 h-4" />
+              Prénom
+            </label>
+            <input 
+              name="first_name" 
+              placeholder="Prénom" 
+              className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" 
+              onChange={handleChange} 
+              value={form.first_name}
+            />
+          </div>
+
+          {/* Last Name */}
+          <div className="space-y-1">
+            <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+              <User className="w-4 h-4" />
+              Nom
+            </label>
+            <input 
+              name="last_name" 
+              placeholder="Nom de famille" 
+              className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" 
+              onChange={handleChange} 
+              value={form.last_name}
+            />
+          </div>
+
           {/* Email */}
           <div className="space-y-1">
             <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
               <Mail className="w-4 h-4" />
-              Email
+              Email *
             </label>
             <input 
               name="email" 
@@ -99,69 +165,43 @@ export default function CreateUserModal({ open, onClose, onCreate }: { open: boo
             />
           </div>
 
-          {/* Phone */}
-          <div className="space-y-1">
-            <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
-              <Phone className="w-4 h-4" />
-              Téléphone
-            </label>
-            <input 
-              name="phone" 
-              placeholder="+33 6 12 34 56 78" 
-              className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" 
-              onChange={handleChange} 
-              value={form.phone}
-            />
-          </div>
-
           {/* Password */}
           <div className="space-y-1">
             <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
               <Lock className="w-4 h-4" />
-              Mot de passe
+              Mot de passe *
             </label>
             <input 
               name="password" 
-              placeholder="Mot de passe sécurisé" 
+              placeholder="Minimum 8 caractères" 
               type="password" 
               className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" 
               onChange={handleChange} 
               value={form.password}
+              minLength={8}
               required 
             />
           </div>
 
-          {/* Role Selection (placeholder) */}
+          {/* Role Selection */}
           <div className="space-y-1">
             <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
               <Shield className="w-4 h-4" />
-              Rôle
+              Rôle *
             </label>
             <select 
               name="role" 
               className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-white"
+              onChange={handleChange}
+              value={form.role}
+              required
             >
               <option value="">Sélectionner un rôle</option>
               <option value="admin">Administrateur</option>
-              <option value="user">Utilisateur</option>
-              <option value="moderator">Modérateur</option>
-            </select>
-          </div>
-
-          {/* Site Selection (placeholder) */}
-          <div className="space-y-1">
-            <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
-              <Globe className="w-4 h-4" />
-              Site
-            </label>
-            <select 
-              name="site" 
-              className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-white"
-            >
-              <option value="">Sélectionner un site</option>
-              <option value="main">Site principal</option>
-              <option value="blog">Blog</option>
-              <option value="shop">Boutique</option>
+              <option value="vendeur">Vendeur</option>
+              <option value="stock">Stock</option>
+              <option value="manager">Manager</option>
+              <option value="comptable">Comptable</option>
             </select>
           </div>
 
@@ -176,8 +216,7 @@ export default function CreateUserModal({ open, onClose, onCreate }: { open: boo
               Annuler
             </button>
             <button 
-              type="button" 
-              onClick={handleSubmit}
+              type="submit"
               className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all font-medium shadow-lg shadow-blue-500/25 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               disabled={isLoading}
             >
@@ -187,11 +226,11 @@ export default function CreateUserModal({ open, onClose, onCreate }: { open: boo
                   Création...
                 </>
               ) : (
-                'Créer l\'utilisateur'
+                "Créer l'utilisateur"
               )}
             </button>
           </div>
-        </div>
+        </form>
       </div>
     </div>
   )

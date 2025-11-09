@@ -1,6 +1,6 @@
 import { apiFetch } from '@/lib/api/client';
 
-// ——— Types (sync with your serializers) ———
+// —— Types (sync with your serializers) ——
 export type UUID = string;
 
 // Add these light types
@@ -34,8 +34,15 @@ export type Product = {
   is_active: boolean; created_at: string; updated_at: string;
 };
 
+export type SalesPointDetail = {
+  id: number;
+  name: string;
+  slug: string;
+  kind: 'SHOWROOM'|'SOCIAL'|'WHATSAPP'|'WEBSITE'|'MARKET'|'OTHER'|'DEPOT'|'FACTORY';
+};
+
 export type OrderLine = {
-  product_detail: any;
+  product_detail: ProductLite;
   id: UUID;
   order: UUID;
   product: UUID;
@@ -50,7 +57,7 @@ export type OrderLine = {
 };
 
 export type Order = {
-  sales_point_detail: any;
+  sales_point_detail: SalesPointDetail;
   id: UUID; code: string; seq: number;
   customer: UUID; customer_detail?: Customer;
   status: 'DRAFT' | 'CONFIRMED' | 'PART_DELIV' | 'DELIVERED' | 'CANCELLED';
@@ -84,7 +91,7 @@ export type InvoiceLine = {
   subtotal: string; tax_amount: string; total: string;
 };
 export type Invoice = {
-  customer_detail: any;
+  customer_detail: Customer;
   id: UUID; code: string; seq: number;
   order?: UUID | null; customer: UUID;
   status: 'DRAFT' | 'ISSUED' | 'PART_PAID' | 'PAID' | 'CANCELLED';
@@ -102,7 +109,7 @@ export type Payment = {
 export type QuoteStatus = 'DRAFT'|'SENT'|'ACCEPTED'|'REJECTED'|'EXPIRED';
 
 export type QuoteLine = {
-  product_detail: any;
+  product_detail: ProductLite;
   id: string;
   quote: string;
   product: string;
@@ -122,7 +129,7 @@ export type Quote = {
   customer: string;
   customer_detail?: Customer;
   sales_point?: number | null;
-  sales_point_detail?: any;
+  sales_point_detail?: SalesPointDetail;
   status: QuoteStatus;
   currency: string;
   valid_until?: string | null;
@@ -154,7 +161,7 @@ export type SalesPoint = {
   slug: string;
   kind: 'SHOWROOM'|'SOCIAL'|'WHATSAPP'|'WEBSITE'|'MARKET'|'OTHER'|'DEPOT'|'FACTORY';
   is_active: boolean;
-  meta: Record<string, any>;
+  meta: Record<string, unknown>;
   created_at: string;
 };
 
@@ -167,24 +174,36 @@ export type DeliveryNoteLine = {
 };
 
 export type DeliveryNote = {
-  order_detail: any;
+  order_detail: OrderLite;
   id: UUID;
   code: string;
   status: 'DRAFT'|'SENT'|'DELIVERED'|'CANCELLED';
   created_at: string;
   order: UUID;
+   delivered_at?: string;
   lines: { id: UUID; order_line: UUID; quantity: string }[];
-
 };
 
-// ——— HTTP helpers ———
+// Type for delete responses
+export type DeleteResponse = Record<string, never>;
+
+// Type for invoice line inputs
+export type InvoiceLineInput = {
+  product: UUID;
+  description?: string;
+  quantity: number | string;
+  unit_price?: number | string;
+  tax_rate?: number | string;
+};
+
+// —— HTTP helpers ——
 const get = <T>(p: string) => apiFetch<T>(p);
-const post = <T>(p: string, body?: any) => apiFetch<T>(p, { method: 'POST', body: body ? JSON.stringify(body) : undefined });
-const put  = <T>(p: string, body: any) => apiFetch<T>(p, { method: 'PUT', body: JSON.stringify(body) });
-const patch= <T>(p: string, body: any) => apiFetch<T>(p, { method: 'PATCH', body: JSON.stringify(body) });
+const post = <T>(p: string, body?: unknown) => apiFetch<T>(p, { method: 'POST', body: body ? JSON.stringify(body) : undefined });
+const put  = <T>(p: string, body: unknown) => apiFetch<T>(p, { method: 'PUT', body: JSON.stringify(body) });
+const patch= <T>(p: string, body: unknown) => apiFetch<T>(p, { method: 'PATCH', body: JSON.stringify(body) });
 const del  = <T>(p: string) => apiFetch<T>(p, { method: 'DELETE' });
 
-// ——— Endpoints ———
+// —— Endpoints ——
 export const SalesApi = {
   // Customers / Products
   customers: {
@@ -196,7 +215,7 @@ products: {
   get: (id: string) => get<Product>(`/sales/products/${id}/`),
   create: (payload: Partial<Product>) => post<Product>('/sales/products/', payload),
   update: (id: string, payload: Partial<Product>) => patch<Product>(`/sales/products/${id}/`, payload),
-  remove: (id: string) => del<{}>(`/sales/products/${id}/`),
+  remove: (id: string) => del<DeleteResponse>(`/sales/products/${id}/`),
   setPrice: (id: string, unit_price: number | string) =>
     post<Product>(`/sales/products/${id}/set_price/`, { unit_price }),
   adjustStock: (id: string, delta: number | string, reason?: string) =>
@@ -210,7 +229,7 @@ products: {
     list: () => get<SalesPoint[]>('/sales/sales-points/'),
     create: (payload: Partial<SalesPoint>) => post<SalesPoint>('/sales/sales-points/', payload),
     update: (id: number, payload: Partial<SalesPoint>) => patch<SalesPoint>(`/sales/sales-points/${id}/`, payload),
-    delete: (id: number) => del<{}>(`/sales/sales-points/${id}/`),
+    delete: (id: number) => del<DeleteResponse>(`/sales/sales-points/${id}/`),
   },
 
   // Orders
@@ -219,7 +238,7 @@ products: {
     get: (id: UUID) => get<Order>(`/sales/orders/${id}/`),
     create: (payload: OrderCreateInput) => post<Order>('/sales/orders/', payload),
     update: (id: UUID, payload: OrderUpdateInput) => patch<Order>(`/sales/orders/${id}/`, payload),
-    remove: (id: UUID) => del<{}>(`/sales/orders/${id}/`),
+    remove: (id: UUID) => del<DeleteResponse>(`/sales/orders/${id}/`),
     confirm: (id: UUID) => post<{ ok: true; status: string }>(`/sales/orders/${id}/confirm/`),
   },
 
@@ -237,7 +256,7 @@ products: {
 
   delivery: {
     // list delivery notes for a given order
-    listByOrder: (orderId: UUID) => get<any[]>(`/sales/delivery-notes/?order=${orderId}`),
+    listByOrder: (orderId: UUID) => get<DeliveryNote[]>(`/sales/delivery-notes/?order=${orderId}`),
   },
 
  deliveryNotes: {
@@ -255,11 +274,11 @@ products: {
   invoices: {
     list: () => get<Invoice[]>('/sales/invoices/'),
     get: (id: UUID) => get<Invoice>(`/sales/invoices/${id}/`),
-    create: (payload: Partial<Invoice> & { lines: any[] }) => post<Invoice>('/sales/invoices/', payload),
+    create: (payload: Partial<Invoice> & { lines: InvoiceLineInput[] }) => post<Invoice>('/sales/invoices/', payload),
     fromOrder: (order_id: UUID) => post<{ ok: true; invoice_id: UUID }>('/sales/invoices/from-order/', { order_id }),
     issue: (id: UUID) => post<{ ok: true; status: string }>(`/sales/invoices/${id}/issue/`),
-    update: (id: UUID, payload: Partial<Invoice> & { lines: any[] }) => put<Invoice>(`/sales/invoices/${id}/`, payload),
-    remove: (id: UUID) => del<{}>(`/sales/invoices/${id}/`),
+    update: (id: UUID, payload: Partial<Invoice> & { lines: InvoiceLineInput[] }) => put<Invoice>(`/sales/invoices/${id}/`, payload),
+    remove: (id: UUID) => del<DeleteResponse>(`/sales/invoices/${id}/`),
     listByOrder: (orderId: UUID) => get<Invoice[]>(`/sales/invoices/?order=${orderId}`)
     
   },

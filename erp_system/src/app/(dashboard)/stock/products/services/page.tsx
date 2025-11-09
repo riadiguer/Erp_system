@@ -17,8 +17,9 @@ import ServiceModal from "./components/ServiceModal";
 import ServiceForm from "./components/ServiceForm";
 import StockAlert from "./components/StockAlert";
 
+
 type StatCardProps = {
-  icon: React.ReactElement<any>;
+  icon: React.ReactElement<{ className?: string }>;
   title: string;
   value: React.ReactNode;
   subtitle?: string;
@@ -88,17 +89,18 @@ export default function ServicesPage() {
       setShowModal(false);
       setSelectedService(null);
       await refresh();
-    } catch (err: any) {
-      console.error("Failed to delete service:", err);
-      if (err.message?.includes("JSON") || err.message?.includes("Unexpected end")) {
-        console.log("Delete might have succeeded despite JSON error, refreshing...");
-        setShowModal(false);
-        setSelectedService(null);
-        await refresh();
-      } else {
-        alert("Erreur lors de la suppression du service: " + (err.message || err));
-      }
-    }
+    } catch (err) {
+  const error = err as { message?: string };
+  console.error("Failed to delete service:", err);
+  if (error.message?.includes("JSON") || error.message?.includes("Unexpected end")) {
+    console.log("Delete might have succeeded despite JSON error, refreshing...");
+    setShowModal(false);
+    setSelectedService(null);
+    await refresh();
+  } else {
+    alert("Erreur lors de la suppression du service: " + (error.message || err));
+  }
+}
   };
 
   const handleAddService = () => {

@@ -31,14 +31,14 @@ export default function ClientsPieChart({ data = MOCK, height = 200 }: Props) {
               innerRadius={38}
               outerRadius={68}
               paddingAngle={4}
-              label={({ name, percent }) => `${name} (${Math.round(percent * 100)}%)`}
+              label={({ name, percent }) => (name ? `${name} (${Math.round(Number(percent ?? 0) * 100)}%)` : null)}
             >
               {data.map((_, idx) => (
                 <Cell key={`cell-${idx}`} fill={COLORS[idx % COLORS.length]} />
               ))}
             </Pie>
 
-            <Tooltip formatter={(v: any) => `${v}`} />
+            <Tooltip formatter={(v: number | string) => `${v}`} />
             <Legend layout="horizontal" verticalAlign="bottom" height={36} />
           </PieChart>
         </ResponsiveContainer>

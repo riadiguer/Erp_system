@@ -26,6 +26,13 @@ interface StatCardProps {
   iconColor: string;
 }
 
+interface ApiError {
+  detail?: string;
+  message?: string;
+  status?: number;
+  errors?: Record<string, string[]>;
+}
+
 const StatCard = ({ icon, title, value, subtitle, bgColor, iconColor }: StatCardProps) => (
   <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
     <div className="flex items-center justify-between">
@@ -76,12 +83,12 @@ const handleDelete = async (matId: number) => {
     toast.success("Matière supprimée avec succès");
     refresh(); // Rafraîchir la liste
     setShowModal(false);
-  } catch (err: any) {
+  } catch (err) {
     console.error("Erreur complète:", err);
     
     let errorMessage = "Erreur lors de la suppression";
-    if (err.detail) {
-      errorMessage = err.detail;
+    if (err && typeof err === 'object' && 'detail' in err) {
+      errorMessage = String((err as ApiError).detail);
     }
     
     toast.error(errorMessage);
@@ -93,7 +100,7 @@ const handleDelete = async (matId: number) => {
     setShowForm(true);
   };
 
-const handleSaveMaterial = async (mat: any) => {
+const handleSaveMaterial = async (mat: Partial<Material>) => {
   console.log("=== DEBUT handleSaveMaterial ===");
   console.log("Données envoyées:", mat);
   console.log("ID présent?", !!mat.id);
@@ -117,31 +124,33 @@ const handleSaveMaterial = async (mat: any) => {
     console.log("Fermeture form...");
     setShowForm(false);
     console.log("=== FIN handleSaveMaterial SUCCESS ===");
-  } catch (err: any) {
+  } catch (err) {
     console.error("=== ERREUR CAPTURÉE ===");
     console.error("Type:", typeof err);
     console.error("Erreur complète:", err);
-    console.error("err.status:", err?.status);
-    console.error("err.detail:", err?.detail);
-    console.error("err.message:", err?.message);
+    
+    const apiError = err as ApiError;
+    console.error("err.status:", apiError?.status);
+    console.error("err.detail:", apiError?.detail);
+    console.error("err.message:", apiError?.message);
     console.error("Object.keys:", Object.keys(err || {}));
     console.error("JSON.stringify:", JSON.stringify(err, null, 2));
     
     let errorMessage = "Erreur lors de l'enregistrement";
     
-    if (err?.detail) {
-      errorMessage = err.detail;
-    } else if (err?.message) {
-      errorMessage = err.message;
-    } else if (err?.status) {
-      errorMessage = `Erreur ${err.status}`;
+    if (apiError?.detail) {
+      errorMessage = apiError.detail;
+    } else if (apiError?.message) {
+      errorMessage = apiError.message;
+    } else if (apiError?.status) {
+      errorMessage = `Erreur ${apiError.status}`;
     }
     
     // Afficher les erreurs de validation
-    if (err?.errors) {
-      console.error("Erreurs de validation:", err.errors);
-      const errors = Object.entries(err.errors)
-        .map(([field, msgs]) => `${field}: ${(msgs as string[]).join(', ')}`)
+    if (apiError?.errors) {
+      console.error("Erreurs de validation:", apiError.errors);
+      const errors = Object.entries(apiError.errors)
+        .map(([field, msgs]) => `${field}: ${msgs.join(', ')}`)
         .join('\n');
       errorMessage = errors || errorMessage;
     }

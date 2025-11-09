@@ -1,11 +1,40 @@
 'use client'
 import React, { useState, useEffect } from 'react'
-import { X, Edit, Check, Package, Calendar, Building, User, Truck, AlertTriangle } from 'lucide-react'
+import { X, Edit, Check, Package,  Truck, AlertTriangle } from 'lucide-react'
+
+interface ReceptionFormData {
+  bonCommande: {
+    id: string
+    numeroBon: string
+    fournisseur: { 
+      id: string
+      nom: string
+      email: string
+    }
+  }
+  dateReception: string
+  heureReception: string
+  receptionnePar: string
+  numeroBonLivraison: string
+  transporteur: string
+  etatLivraison: string
+  produits: Array<{
+    id: string
+    nom: string
+    quantiteCommandee: number
+    quantiteRecue: number
+    etat: string
+    prixUnitaire: number
+    commentaire: string
+  }>
+  commentairesReception: string
+  montantTotal: number
+}
 
 interface EditReceptionModalProps {
   isOpen: boolean
   onClose: () => void
-  onSave: (formData: any) => void
+  onSave: (formData: ReceptionFormData) => void
   reception: {
     id: string
     numeroReception: string
@@ -56,8 +85,6 @@ export default function EditReceptionModal({
   onClose, 
   onSave, 
   reception,
-  fournisseursDispo, 
-  bonsCommandeDispo 
 }: EditReceptionModalProps) {
   const [formData, setFormData] = useState({
     bonCommande: { id: '', numeroBon: '', fournisseur: { id: '', nom: '', email: '' } },
@@ -134,7 +161,7 @@ export default function EditReceptionModal({
     }
   }
 
-  const updateProduitRecu = (produitId, field, value) => {
+  const updateProduitRecu = (produitId: string, field: string, value: string | number) => {
     setFormData({
       ...formData,
       produits: formData.produits.map(p => 

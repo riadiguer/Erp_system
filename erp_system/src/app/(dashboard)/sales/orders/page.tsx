@@ -6,6 +6,12 @@ import { useOrders, useCustomers, useProducts, useSalesPoints } from '@/lib/feat
 import { SalesApi, type OrderCreateInput, type OrderUpdateInput, type Order } from '@/lib/features/sales/api';
 import { PermissionGate } from '@/components/guards/PermissionGate';
 
+interface ApiError {
+  code?: string;
+  detail?: string;
+  status?: number;
+}
+
 export default function OrdersPage() {
   const router = useRouter();
   const { orders, loading, error, refresh } = useOrders();
@@ -23,7 +29,7 @@ export default function OrdersPage() {
   
   // Form States
   const [createForm, setCreateForm] = useState<OrderCreateInput>({
-    customer: '' as any,
+    customer: '',
     currency: 'DZD',
     notes: '',
     sales_point: 0,
@@ -46,11 +52,11 @@ export default function OrdersPage() {
     try {
       await SalesApi.orders.create(createForm);
       setCreating(false);
-      setCreateForm({ customer: '' as any, currency: 'DZD', notes: '', sales_point: 0, lines: [] });
+      setCreateForm({ customer: 0, currency: 'DZD', notes: '', sales_point: 0, lines: [] });
       await refresh();
-    } catch (error: any) {
-      console.error('Failed to create order:', error);
-      handleApiError(error, 'Failed to create order');
+    } catch (err) {
+      console.error('Failed to create order:', err);
+      handleApiError(err as ApiError, 'Failed to create order');
     } finally {
       setActionLoading(null);
     }
@@ -68,9 +74,9 @@ export default function OrdersPage() {
       setEditingOrder(null);
       setEditForm({ expected_delivery_date: '', notes: '', lines: [] });
       await refresh();
-    } catch (error: any) {
-      console.error('Failed to update order:', error);
-      handleApiError(error, 'Failed to update order');
+    } catch (err) {
+      console.error('Failed to update order:', err);
+      handleApiError(err as ApiError, 'Failed to update order');
     } finally {
       setActionLoading(null);
     }
@@ -84,9 +90,9 @@ export default function OrdersPage() {
     try {
       await SalesApi.orders.confirm(id);
       await refresh();
-    } catch (error: any) {
-      console.error('Failed to confirm order:', error);
-      handleApiError(error, 'Failed to confirm order');
+    } catch (err) {
+      console.error('Failed to confirm order:', err);
+      handleApiError(err as ApiError, 'Failed to confirm order');
     } finally {
       setActionLoading(null);
     }
@@ -104,9 +110,9 @@ export default function OrdersPage() {
     try {
       await SalesApi.orders.remove(id);
       await refresh();
-    } catch (error: any) {
-      console.error('Failed to delete order:', error);
-      handleApiError(error, 'Failed to delete order');
+    } catch (err) {
+      console.error('Failed to delete order:', err);
+      handleApiError(err as ApiError, 'Failed to delete order');
     } finally {
       setActionLoading(null);
     }
@@ -120,16 +126,16 @@ export default function OrdersPage() {
     try {
       const result = await SalesApi.invoices.fromOrder(orderId);
       router.push(`/sales/invoices/${result.invoice_id}`);
-    } catch (error: any) {
-      console.error('Failed to create invoice:', error);
-      handleApiError(error, 'Failed to create invoice');
+    } catch (err) {
+      console.error('Failed to create invoice:', err);
+      handleApiError(err as ApiError, 'Failed to create invoice');
     } finally {
       setActionLoading(null);
     }
   }
 
   // Error Handler
-  function handleApiError(error: any, defaultMessage: string) {
+  function handleApiError(error: ApiError, defaultMessage: string) {
     if (error?.code === 'CONFIG_ERROR') {
       setActionError('Configuration error: API URL not set. Please contact your administrator.');
     } else if (error?.code === 'NETWORK_ERROR') {
@@ -142,7 +148,7 @@ export default function OrdersPage() {
       setActionError('Permission denied. You do not have access to perform this action.');
     } else if (error?.status === 404) {
       setActionError('Resource not found.');
-    } else if (error?.status >= 500) {
+    } else if (error?.status && error.status >= 500) {
       setActionError('Server error. Please try again later.');
     } else {
       setActionError(error?.detail || defaultMessage);
@@ -303,7 +309,7 @@ export default function OrdersPage() {
                   <select
                     className="w-full rounded-xl border border-gray-300 px-4 py-3 bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-colors"
                     value={createForm.customer || ''}
-                    onChange={(e) => setCreateForm((f) => ({ ...f, customer: e.target.value as any }))}
+                    onChange={(e) => setCreateForm((f) => ({ ...f, customer: e.target.value }))}
                   >
                     <option value="">Select a customer...</option>
                     {customers?.filter(c => c.is_active).map((c) => (
@@ -443,7 +449,10 @@ export default function OrdersPage() {
                     tax_rate: typeof p.tax_rate === 'string' ? Number(p.tax_rate) : p.tax_rate,
                   })) || []
                 }
-                initialLines={editForm.lines || []}
+                initialLines={(editForm.lines || []).map(line => ({
+                  ...line,
+                  quantity: typeof line.quantity === 'string' ? parseFloat(line.quantity) : line.quantity
+                }))}
                 onChange={(lines) => setEditForm(f => ({ ...f, lines }))} 
               />
 
@@ -741,25 +750,41 @@ export default function OrdersPage() {
   );
 }
 
+interface LineItem {
+  product: string;
+  description?: string;
+  quantity: number;
+  unit_price?: number;
+  tax_rate?: number;
+}
+
+interface ProductOption {
+  id: string;
+  sku: string;
+  name: string;
+  unit_price?: number;
+  tax_rate?: number;
+}
+
 function LinesEditor({
   products,
   initialLines = [],
   onChange,
 }: {
-  products: { id: string; sku: string; name: string; unit_price?: number; tax_rate?: number; }[];
-  initialLines?: any[];
-  onChange: (lines: { product: string; description?: string; quantity: number; unit_price?: number; tax_rate?: number; }[]) => void;
+  products: ProductOption[];
+  initialLines?: LineItem[];
+  onChange: (lines: LineItem[]) => void;
 }) {
-  const [rows, setRows] = useState<any[]>(initialLines.length > 0 ? initialLines : []);
+  const [rows, setRows] = useState<LineItem[]>(initialLines.length > 0 ? initialLines : []);
 
   function addRow() {
-    const newRow = { product: '', quantity: 1, unit_price: 0, tax_rate: 0, description: '' };
+    const newRow: LineItem = { product: '', quantity: 1, unit_price: 0, tax_rate: 0, description: '' };
     const newRows = [...rows, newRow];
     setRows(newRows);
     onChange(newRows);
   }
   
-  function update(i: number, patch: any) {
+  function update(i: number, patch: Partial<LineItem>) {
     let finalPatch = { ...patch };
     
     // If product is being changed, auto-populate unit_price and tax_rate from backend
@@ -789,16 +814,16 @@ function LinesEditor({
 
   // Calculate totals
   const orderTotal = rows.reduce((total, row) => {
-    if (row.product && row.quantity > 0 && row.unit_price > 0) {
+    if (row.product && row.quantity > 0 && row.unit_price && row.unit_price > 0) {
       const lineSubtotal = row.quantity * row.unit_price;
-      const lineTax = lineSubtotal * (row.tax_rate / 100);
+      const lineTax = lineSubtotal * ((row.tax_rate || 0) / 100);
       return total + lineSubtotal + lineTax;
     }
     return total;
   }, 0);
 
   const orderSubtotal = rows.reduce((total, row) => {
-    if (row.product && row.quantity > 0 && row.unit_price > 0) {
+    if (row.product && row.quantity > 0 && row.unit_price && row.unit_price > 0) {
       return total + (row.quantity * row.unit_price);
     }
     return total;
@@ -833,7 +858,7 @@ function LinesEditor({
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
             </svg>
             <p className="font-medium">No items added yet</p>
-            <p className="text-sm">Click "Add Item" to start building your order</p>
+            <p className="text-sm">Click &ldquo;Add Item&rdquo; to start building your order</p>
           </div>
         ) : (
           rows.map((row, i) => (
@@ -913,7 +938,7 @@ function LinesEditor({
               </div>
               
               {/* Line Total Display */}
-              {row.product && row.quantity > 0 && row.unit_price > 0 && (
+              {row.product && row.quantity > 0 && row.unit_price && row.unit_price > 0 && (
                 <div className="bg-blue-50 rounded-lg p-3 mb-3">
                   <div className="flex justify-between items-center text-sm">
                     <span className="text-gray-600">Line Total (excl. tax):</span>
@@ -921,7 +946,7 @@ function LinesEditor({
                       {(row.quantity * row.unit_price).toFixed(2)}
                     </span>
                   </div>
-                  {row.tax_rate > 0 && (
+                  {row.tax_rate && row.tax_rate > 0 && (
                     <>
                       <div className="flex justify-between items-center text-sm">
                         <span className="text-gray-600">Tax ({row.tax_rate}%):</span>

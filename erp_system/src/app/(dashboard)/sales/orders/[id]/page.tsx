@@ -1,6 +1,6 @@
 'use client';
 
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import { useState } from 'react';
 import { useOrder, useDeliveryNotesByOrder, useInvoicesByOrder } from '@/lib/features/sales/hooks';
 import { SalesApi } from '@/lib/features/sales/api';
@@ -116,7 +116,6 @@ function MetricCard({ label, value, currency }: { label: string; value: number |
 
 export default function OrderDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const router = useRouter();
   const { order, loading, error, refresh } = useOrder(id);
   const { deliveryNotes } = useDeliveryNotesByOrder(id);
   const { invoices, refresh: refreshInvoices } = useInvoicesByOrder(id);
@@ -133,7 +132,6 @@ export default function OrderDetailPage() {
     if (!order) return;
     setBusy(true);
     try {
-      const res = await SalesApi.invoices.fromOrder(order.id);
       await refreshInvoices();
       // navigate to the new invoice if you want:
       // router.push(`/sales/invoices/${res.invoice_id}`);

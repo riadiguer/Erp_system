@@ -1,6 +1,6 @@
 "use client";
 
-import { Eye, Pencil, Trash2, CreditCard, FileText, TrendingUp, AlertCircle, Loader2, Package } from "lucide-react";
+import { Eye, Pencil, Trash2, CreditCard, FileText, TrendingUp,  Loader2, Package } from "lucide-react";
 import { type Supplier } from "@/lib/features/warehouse/types";
 
 interface SupplierTableProps {
@@ -48,7 +48,7 @@ export default function SupplierTable({
     title, 
     color 
   }: {
-    icon: any;
+    icon: React.ComponentType<{ className?: string }>;
     onClick: () => void;
     title: string;
     color: string;

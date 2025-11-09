@@ -6,7 +6,6 @@ import {
   Trash2, 
   ShoppingCart, 
   Package, 
-  TrendingUp,
   TrendingDown,
   AlertCircle,
   CheckCircle,
@@ -14,15 +13,34 @@ import {
   List
 } from "lucide-react";
 
+interface Material {
+  id: number;
+  name: string;
+  reference: string;
+  category: string;
+  supplier: string;
+  stock: number;
+  minStock: number;
+  unit: string;
+}
+
+interface WarehouseListProps {
+  materials: Material[];
+  searchTerm: string;
+  onViewDetails: (material: Material) => void;
+  onEdit: (material: Material) => void;
+  onDelete: (id: number) => void;
+}
+
 export default function WarehouseList({
   materials,
   searchTerm,
   onViewDetails,
   onEdit,
   onDelete,
-}) {
+}: WarehouseListProps) {
   const [filterCategory, setFilterCategory] = useState("");
-  const [viewMode, setViewMode] = useState("grid"); // 'grid' ou 'list'
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
   // Filtrage (recherche + catégorie)
   const filteredMaterials = materials.filter((mat) => {
@@ -40,7 +58,7 @@ export default function WarehouseList({
   const categories = Array.from(new Set(materials.map((m) => m.category)));
 
   // Fonction pour déterminer le statut du stock
-  const getStockStatus = (stock, minStock) => {
+  const getStockStatus = (stock: number, minStock: number) => {
     const percentage = (stock / minStock) * 100;
     if (percentage < 50) return { 
       status: "Critique", 
@@ -221,7 +239,7 @@ export default function WarehouseList({
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {filteredMaterials.map((mat) => {
+            {filteredMaterials.map((mat: Material) => {
               const stockStatus = getStockStatus(mat.stock, mat.minStock);
               
               return (

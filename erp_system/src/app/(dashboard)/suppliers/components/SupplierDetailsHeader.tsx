@@ -1,6 +1,6 @@
 "use client";
 
-import { Building2, MapPin, Phone, Mail, Hash, CreditCard, Calendar, FileText } from "lucide-react";
+import { Building2, MapPin, Phone, Mail, Hash, CreditCard, FileText } from "lucide-react";
 import { Supplier } from "@/lib/features/warehouse/types";
 import { usePurchaseOrders } from "@/lib/features/warehouse/hooks";
 import { useMemo } from "react";
@@ -45,7 +45,7 @@ export default function SupplierDetailsHeader({ supplier }: SupplierDetailsHeade
     value, 
     color = "text-gray-600" 
   }: {
-    icon: any;
+    icon: React.ComponentType<{ className?: string }>;
     label: string;
     value: string | null | undefined;
     color?: string;

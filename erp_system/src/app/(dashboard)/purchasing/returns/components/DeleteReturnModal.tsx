@@ -1,6 +1,6 @@
 'use client'
 import React from 'react'
-import { X, Trash2, AlertTriangle, Building, Package, Calendar, DollarSign, RotateCcw } from 'lucide-react'
+import { X, Trash2, AlertTriangle, Building, Calendar, DollarSign, RotateCcw } from 'lucide-react'
 
 interface DeleteReturnModalProps {
   isOpen: boolean
@@ -176,7 +176,7 @@ export default function DeleteReturnModal({
                     </span>
                     {retourFournisseur.descriptionMotif && (
                       <p className="text-sm text-gray-600 mt-2 italic">
-                        "{retourFournisseur.descriptionMotif}"
+                        &quot;{retourFournisseur.descriptionMotif}&quot;
                       </p>
                     )}
                   </div>
@@ -268,7 +268,7 @@ export default function DeleteReturnModal({
             <div className="mt-4 bg-white p-4 rounded-lg border border-yellow-200">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="flex justify-between items-center">
-                  <span className="font-medium text-gray-700">Montant d'achat initial:</span>
+                  <span className="font-medium text-gray-700">Montant d&apos;achat initial:</span>
                   <span className="font-bold text-gray-900">{retourFournisseur.prixAchat.toLocaleString()} DT</span>
                 </div>
                 <div className="flex justify-between items-center">
@@ -284,7 +284,7 @@ export default function DeleteReturnModal({
             <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
               <h5 className="font-semibold text-gray-900 mb-2">Commentaires qui seront perdus :</h5>
               <p className="text-sm text-gray-700 italic bg-white p-3 rounded border-l-4 border-gray-400">
-                "{retourFournisseur.commentaires}"
+                &quot;{retourFournisseur.commentaires}&quot;
               </p>
             </div>
           )}
@@ -297,8 +297,8 @@ export default function DeleteReturnModal({
                 <div>
                   <h5 className="font-bold text-orange-900 mb-2">Attention : Retour en cours de traitement !</h5>
                   <p className="text-sm text-orange-800">
-                    Ce retour a le statut "En cours", ce qui signifie qu'il est probablement en cours de négociation 
-                    avec le fournisseur. La suppression n'annulera pas automatiquement les démarches en cours. 
+                    Ce retour a le statut &quot;En cours&quot;, ce qui signifie qu&apos;il est probablement en cours de négociation 
+                    avec le fournisseur. La suppression n&apos;annulera pas automatiquement les démarches en cours. 
                     Vous devrez peut-être informer le fournisseur séparément.
                   </p>
                 </div>
@@ -333,9 +333,9 @@ export default function DeleteReturnModal({
                   <li>Le retour {retourFournisseur.numeroRetour} sera définitivement supprimé</li>
                   <li>{retourFournisseur.produits.length} article{retourFournisseur.produits.length > 1 ? 's' : ''} et {getTotalQuantiteRetournee()} unité{getTotalQuantiteRetournee() > 1 ? 's' : ''} retournée{getTotalQuantiteRetournee() > 1 ? 's' : ''} seront perdu{getTotalQuantiteRetournee() > 1 ? 'es' : 'e'}</li>
                   <li>Le montant de {retourFournisseur.montantRetour.toLocaleString()} DT ne sera plus suivi</li>
-                  <li>L'historique et les commentaires associés seront effacés</li>
+                  <li>L&apos;historique et les commentaires associés seront effacés</li>
                   <li>Les informations du fournisseur {retourFournisseur.fournisseur.nom} seront perdues pour ce retour</li>
-                  <li>Le motif "{retourFournisseur.motifRetour}" et sa description seront supprimés</li>
+                  <li>Le motif &quot;{retourFournisseur.motifRetour}&quot; et sa description seront supprimés</li>
                   <li>Cette action ne pourra pas être annulée</li>
                 </ul>
               </div>

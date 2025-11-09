@@ -30,7 +30,7 @@ import SupplierPaymentsModal from "./components/SupplierPaymentsModal";
 import SupplierOrderModal from "./components/SupplierOrderModal";
 import SupplierStatsChart from "./components/Charts/SupplierStatsChart";
 import SupplierEvolutionChart from "./components/Charts/SupplierEvolutionChart";
-import { useSuppliers, usePurchaseOrders, useSupplierStatistics } from "@/lib/features/warehouse/hooks";
+import { useSuppliers, usePurchaseOrders } from "@/lib/features/warehouse/hooks";
 import { Supplier } from "@/lib/features/warehouse/types";
 import { toast } from "sonner";
 
@@ -158,10 +158,13 @@ export default function SuppliersDashboard() {
   // Hooks API
   const { suppliers, loading, error, refresh, isValidating } = useSuppliers();
   const { orders } = usePurchaseOrders();
-  const { statistics: supplierStats } = useSupplierStatistics();
+  
+  // Memoize the suppliers list to prevent it from changing on every render
+  const suppliersList: Supplier[] = useMemo(() => {
+    return Array.isArray(suppliers) ? suppliers : [];
+  }, [suppliers]);
 
   // Safeguards
-  const suppliersList: Supplier[] = Array.isArray(suppliers) ? suppliers : [];
   const validating = Boolean(isValidating ?? loading);
 
   // State pour les modales
@@ -233,13 +236,6 @@ export default function SuppliersDashboard() {
       return `${(amount / 1000).toFixed(0)}K DA`;
     }
     return `${amount.toFixed(0)} DA`;
-  };
-
-  // Calculate percentage change (mock for now - would need historical data)
-  const calculateChange = (current: number, previous: number) => {
-    if (previous === 0) return "+100%";
-    const change = ((current - previous) / previous) * 100;
-    return `${change > 0 ? '+' : ''}${change.toFixed(0)}%`;
   };
 
   // Loading state

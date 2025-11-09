@@ -1,19 +1,20 @@
 "use client";
 import React, { useEffect, useMemo, useState } from "react";
 import { Eye, Edit, Trash2, User, Mail, Phone, ChevronUp, ChevronDown, Download, X } from "lucide-react";
+import { useDeleteCustomer } from "@/lib/features/customer/hooks";
 
 export type Client = {
   id: string;
-  firstName?: string;
-  lastName?: string;
+  firstName: string;
+  lastName: string;
   email?: string;
   phone?: string;
-  type?: "Particulier" | "Société";
-  balance?: number;
+  type: "Particulier" | "Société" | "INDIVIDUAL" | "BUSINESS";
+  balance: number;
   revenue?: number;
   lastOrder?: string;
-  createdAt?: string;
-  status?: "Actif" | "Inactif";
+  createdAt: string;
+  status: "Actif" | "Inactif";
 };
 
 type Props = {
@@ -41,6 +42,21 @@ export default function ClientTable({
   const [localPageSize, setLocalPageSize] = useState<number>(pageSize);
   const [selected, setSelected] = useState<Record<string, boolean>>({});
 
+  const deleteMutation = useDeleteCustomer({
+    onSuccess: () => {
+      // Remove deleted item from selection
+      setSelected((prev) => {
+        const newSelected = { ...prev };
+        Object.keys(newSelected).forEach((id) => {
+          if (!clients.find((c) => c.id === id)) {
+            delete newSelected[id];
+          }
+        });
+        return newSelected;
+      });
+    },
+  });
+
   useEffect(() => {
     if (onSelectionChange) {
       const ids = Object.entries(selected).filter(([, v]) => v).map(([k]) => k);
@@ -64,8 +80,8 @@ export default function ClientTable({
   const sorted = useMemo(() => {
     if (!sortBy) return clients;
     return [...clients].sort((a, b) => {
-      const va = (a[sortBy] ?? "") as any;
-      const vb = (b[sortBy] ?? "") as any;
+      const va = a[sortBy] ?? "";
+      const vb = b[sortBy] ?? "";
       if (typeof va === "number" && typeof vb === "number") return sortDir === "asc" ? va - vb : vb - va;
       return sortDir === "asc" ? String(va).localeCompare(String(vb)) : String(vb).localeCompare(String(va));
     });
@@ -99,9 +115,29 @@ export default function ClientTable({
   const selectedCount = selectedIds.length;
 
   const handleDelete = (id: string) => {
-    const ok = confirm("Voulez-vous vraiment supprimer ce client ? Cette action est irréversible.");
-    if (!ok) return;
+    if (!confirm("Voulez-vous vraiment supprimer ce client ? Cette action est irréversible.")) {
+      return;
+    }
     onDelete(id);
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedCount === 0) return;
+    
+    if (!confirm(`Supprimer ${selectedCount} client(s) sélectionné(s) ? Cette action est irréversible.`)) {
+      return;
+    }
+
+    // Delete all selected clients
+    for (const id of selectedIds) {
+      try {
+        await deleteMutation.mutateAsync(Number(id));
+      } catch (error) {
+        console.error(`Failed to delete client ${id}:`, error);
+      }
+    }
+    
+    clearSelection();
   };
 
   const handleExportSelected = () => {
@@ -109,14 +145,15 @@ export default function ClientTable({
       alert("Aucun client sélectionné.");
       return;
     }
-    if (onExportSelected) onExportSelected(selectedIds);
-    else {
-      const header = ["id", "firstName", "lastName", "email", "phone", "type", "balance", "revenue", "createdAt", "status"];
+    if (onExportSelected) {
+      onExportSelected(selectedIds);
+    } else {
+      const header = ["id", "firstName", "lastName", "email", "phone", "type", "balance", "revenue", "createdAt", "status"] as const;
       const rows = clients
         .filter((c) => selected[c.id])
         .map((c) =>
           header.map((h) => {
-            const v = (c as any)[h];
+            const v = c[h];
             if (v === undefined || v === null) return "";
             return String(v).replace(/"/g, '""');
           })
@@ -158,15 +195,12 @@ export default function ClientTable({
               Exporter
             </button>
             <button
-              onClick={() => {
-                if (!confirm(`Supprimer ${selectedCount} client(s) sélectionné(s) ?`)) return;
-                selectedIds.forEach((id) => onDelete(id));
-                clearSelection();
-              }}
-              className="inline-flex items-center px-3 py-1.5 text-sm rounded-lg border border-red-300 bg-white hover:bg-red-50 transition-colors font-medium text-red-700"
+              onClick={handleBulkDelete}
+              disabled={deleteMutation.isPending}
+              className="inline-flex items-center px-3 py-1.5 text-sm rounded-lg border border-red-300 bg-white hover:bg-red-50 transition-colors font-medium text-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Trash2 className="w-4 h-4 mr-2" />
-              Supprimer
+              {deleteMutation.isPending ? "Suppression..." : "Supprimer"}
             </button>
             <button
               onClick={clearSelection}
@@ -189,6 +223,7 @@ export default function ClientTable({
                   className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                   aria-label="Sélectionner tout sur la page"
                   onChange={(e) => selectAllOnPage(e.target.checked)}
+                  checked={current.length > 0 && current.every((c) => selected[c.id])}
                 />
               </th>
 
@@ -226,9 +261,6 @@ export default function ClientTable({
                 </div>
               </th>
 
-              
-              
-
               <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Actions
               </th>
@@ -238,7 +270,7 @@ export default function ClientTable({
           <tbody className="bg-white divide-y divide-gray-200">
             {current.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-4 py-12 text-center">
+                <td colSpan={6} className="px-4 py-12 text-center">
                   <User className="w-12 h-12 text-gray-400 mx-auto mb-3" />
                   <p className="text-gray-600 font-medium">Aucun client à afficher</p>
                   <p className="text-sm text-gray-500 mt-1">Commencez par ajouter votre premier client</p>
@@ -304,11 +336,11 @@ export default function ClientTable({
 
                 <td className="px-4 py-4">
                   <span className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium ${
-                    c.type === "Société" 
+                    c.type === "BUSINESS" || c.type === "Société" 
                       ? "bg-purple-100 text-purple-800" 
                       : "bg-blue-100 text-blue-800"
                   }`}>
-                    {c.type ?? "-"}
+                    {c.type === "BUSINESS" ? "Société" : c.type === "INDIVIDUAL" ? "Particulier" : c.type}
                   </span>
                 </td>
 
@@ -320,7 +352,6 @@ export default function ClientTable({
                   </span>
                 </td>
 
-                
                 <td className="px-4 py-4 text-right">
                   <div className="flex items-center justify-end space-x-2">
                     <button
@@ -339,7 +370,8 @@ export default function ClientTable({
                     </button>
                     <button
                       onClick={() => handleDelete(c.id)}
-                      className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      disabled={deleteMutation.isPending}
+                      className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       title="Supprimer"
                     >
                       <Trash2 className="w-4 h-4" />

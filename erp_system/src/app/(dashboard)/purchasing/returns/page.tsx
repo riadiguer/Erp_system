@@ -10,12 +10,9 @@ import {
   RotateCcw, 
   ArrowLeft,
   AlertTriangle,
-  User,
   Package,
-  Calendar,
   Building,
   DollarSign,
-  MessageSquare,
   MoreHorizontal
 } from 'lucide-react'
 
@@ -25,15 +22,61 @@ import ViewReturnModal from './components/ViewReturnModal'
 import EditReturnModal from './components/EditReturnModal'
 import DeleteReturnModal from './components/DeleteReturnModal'
 
+// Types
+interface Produit {
+  id: string
+  nom: string
+  quantite: number
+  prixUnitaire: number
+  type: 'produit' | 'matiere'
+  quantiteRetournee: number
+}
+
+interface RetourFournisseur {
+  id: string
+  numeroRetour: string
+  dateRetour: string
+  fournisseur: { 
+    id: string
+    nom: string
+    email: string
+    telephone: string
+  }
+  statut: string
+  produits: Produit[]
+  motifRetour: string
+  descriptionMotif: string
+  prixAchat: number
+  montantRetour: number
+  commentaires: string
+  gestionnaire: string
+  numeroCommande: string
+}
+
+interface Fournisseur {
+  id: string
+  nom: string
+  email: string
+  telephone: string
+  adresse: string
+}
+
+interface ProduitDispo {
+  id: string
+  nom: string
+  type: 'produit' | 'matiere'
+  prixUnitaire: number
+}
+
 export default function ReturnsPage() {
   const [showModal, setShowModal] = useState(false)
   const [modalType, setModalType] = useState('')
-  const [selectedItem, setSelectedItem] = useState(null)
+  const [selectedItem, setSelectedItem] = useState<RetourFournisseur | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
-  const [showMobileMenu, setShowMobileMenu] = useState({})
+  const [showMobileMenu, setShowMobileMenu] = useState<Record<string, boolean>>({})
   
   // Données d'exemple pour les retours fournisseur
-  const [retoursFournisseur, setRetoursFournisseur] = useState([
+  const [retoursFournisseur, setRetoursFournisseur] = useState<RetourFournisseur[]>([
     {
       id: 'RF001',
       numeroRetour: 'RF-2024-001',
@@ -123,7 +166,7 @@ export default function ReturnsPage() {
     }
   ])
 
-  const [fournisseursDispo] = useState([
+  const [fournisseursDispo] = useState<Fournisseur[]>([
     { 
       id: 'F001', 
       nom: 'TechSupply SARL',
@@ -147,7 +190,7 @@ export default function ReturnsPage() {
     }
   ])
 
-  const [produitsDispo] = useState([
+  const [produitsDispo] = useState<ProduitDispo[]>([
     { id: 'P001', nom: 'Ordinateur portable Dell', type: 'produit', prixUnitaire: 2500 },
     { id: 'P002', nom: 'Imprimante laser HP', type: 'produit', prixUnitaire: 800 },
     { id: 'P003', nom: 'Écran 24 pouces Samsung', type: 'produit', prixUnitaire: 450 },
@@ -160,7 +203,7 @@ export default function ReturnsPage() {
     { id: 'M005', nom: 'Stylos à bille', type: 'matiere', prixUnitaire: 1.5 }
   ])
 
-  const [motifsDispo] = useState([
+  const [motifsDispo] = useState<string[]>([
     'Produit défectueux',
     'Erreur de commande',
     'Livraison endommagée',
@@ -171,7 +214,7 @@ export default function ReturnsPage() {
     'Autre'
   ])
 
-  const openModal = (type, item = null) => {
+  const openModal = (type: string, item: RetourFournisseur | null = null) => {
     setModalType(type)
     setSelectedItem(item)
     setShowModal(true)
@@ -184,26 +227,34 @@ export default function ReturnsPage() {
     setSelectedItem(null)
   }
 
-  const handleAddRetour = (formData) => {
-    const newRetour = {
+  const handleAddRetour = (formData: Partial<RetourFournisseur>) => {
+    const newRetour: RetourFournisseur = {
       id: `RF${String(retoursFournisseur.length + 1).padStart(3, '0')}`,
       numeroRetour: `RF-2024-${String(retoursFournisseur.length + 1).padStart(3, '0')}`,
-      ...formData,
       dateRetour: new Date().toISOString().split('T')[0],
-      statut: 'En cours'
+      statut: 'En cours',
+      fournisseur: formData.fournisseur || { id: '', nom: '', email: '', telephone: '' },
+      produits: formData.produits || [],
+      motifRetour: formData.motifRetour || '',
+      descriptionMotif: formData.descriptionMotif || '',
+      prixAchat: formData.prixAchat || 0,
+      montantRetour: formData.montantRetour || 0,
+      commentaires: formData.commentaires || '',
+      gestionnaire: formData.gestionnaire || '',
+      numeroCommande: formData.numeroCommande || ''
     }
     setRetoursFournisseur([...retoursFournisseur, newRetour])
     closeModal()
   }
 
-  const handleEditRetour = (formData) => {
+  const handleEditRetour = (formData: Partial<RetourFournisseur>) => {
     setRetoursFournisseur(retoursFournisseur.map(rf => 
-      rf.id === selectedItem.id ? { ...rf, ...formData } : rf
+      rf.id === selectedItem?.id ? { ...rf, ...formData } : rf
     ))
     closeModal()
   }
 
-  const handleDeleteRetour = (id) => {
+  const handleDeleteRetour = (id: string) => {
     setRetoursFournisseur(retoursFournisseur.filter(rf => rf.id !== id))
     closeModal()
   }
@@ -216,7 +267,7 @@ export default function ReturnsPage() {
     retour.gestionnaire.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
-  const getStatutColor = (statut) => {
+  const getStatutColor = (statut: string) => {
     switch (statut) {
       case 'En cours': return 'text-orange-700 bg-orange-100 border-orange-200'
       case 'Accepté': return 'text-green-700 bg-green-100 border-green-200'
@@ -226,7 +277,7 @@ export default function ReturnsPage() {
     }
   }
 
-  const getMotifColor = (motif) => {
+  const getMotifColor = (motif: string) => {
     switch (motif) {
       case 'Produit défectueux': return 'text-red-700 bg-red-100 border-red-200'
       case 'Erreur de commande': return 'text-yellow-700 bg-yellow-100 border-yellow-200'
@@ -240,11 +291,7 @@ export default function ReturnsPage() {
     return retoursFournisseur.reduce((total, retour) => total + retour.montantRetour, 0)
   }
 
-  const getTotalMontantAchats = () => {
-    return retoursFournisseur.reduce((total, retour) => total + retour.prixAchat, 0)
-  }
-
-  const toggleMobileMenu = (id) => {
+  const toggleMobileMenu = (id: string) => {
     setShowMobileMenu(prev => ({
       ...prev,
       [id]: !prev[id]

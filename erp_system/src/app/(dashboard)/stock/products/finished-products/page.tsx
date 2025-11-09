@@ -37,7 +37,7 @@ const StatCard: React.FC<StatCardProps> = ({ icon, title, value, subtitle, bgCol
         )}
       </div>
       <div className={`p-3 rounded-full ${bgColor}`}>
-        {React.cloneElement(icon as React.ReactElement<any>, { className: `w-6 h-6 ${iconColor}` })}
+        {React.cloneElement(icon as React.ReactElement<{ className?: string }>, { className: `w-6 h-6 ${iconColor}` })}
       </div>
     </div>
   </div>

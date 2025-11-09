@@ -7,7 +7,6 @@ import {
   Briefcase,
   TrendingUp,
   Calendar,
-  DollarSign,
   BarChart3,
   AlertCircle,
   CheckCircle,

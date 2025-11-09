@@ -1,87 +1,75 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { Search, Plus, MoreVertical, Users, Mail, Phone, Shield, Globe, Clock, Filter, Download } from 'lucide-react'
-import { useRouter } from "next/navigation"
+import { Search, Plus, MoreVertical, Users, Mail, Phone, Shield, Globe, Clock } from 'lucide-react'
 import CreateUserModal from '@/components/CreateUserModal'
 import UserDetailsModal from '@/components/UserDetailsModal'
 import RolesModal from '@/components/RolesModal'
-
-
+import { apiFetch } from '@/lib/api/client'
+import { RolesApi, type Role } from '@/lib/features/roles/api'
 
 type User = {
   id: number
   username: string
   email: string
+  first_name?: string
+  last_name?: string
   phone?: string
   roles: string[]
+  permissions?: string[]
   sites?: string[]
   status?: string
   last_login?: string
   avatar?: string
 }
 
+type ApiError = {
+  detail?: string
+  message?: string
+}
+
 export default function UsersPage() {
-
-
   const [users, setUsers] = useState<User[]>([])
+  const [roles, setRoles] = useState<Role[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedUsers, setSelectedUsers] = useState<number[]>([])
   const [statusFilter, setStatusFilter] = useState('all')
   const [roleFilter, setRoleFilter] = useState('all')
-  const router = useRouter()
   const [modalOpen, setModalOpen] = useState(false)
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [rolesModalOpen, setRolesModalOpen] = useState(false)
-  const roles = [
-  { id: 1, name: 'admin' },
-  { id: 2, name: 'vendeur' },
-  { id: 3, name: 'stock' },
-  { id: 4, name: 'manager' },
-  { id: 5, name: 'comptable' },
-  // Ajoute tous les rôles existants ici (ou importe-les si tu veux centraliser)
-]
 
-
-  // Mock data for demonstration
+  // Fetch users and roles from backend
   useEffect(() => {
-    // Simulating API call
-    setTimeout(() => {
-      setUsers([
-        {
-          id: 1,
-          username: "john_doe",
-          email: "john@example.com",
-          phone: "+33 6 12 34 56 78",
-          roles: ["admin", "manager"],
-          sites: ["Paris", "Lyon"],
-          status: "actif",
-          last_login: "2024-12-01T10:30:00Z"
-        },
-        {
-          id: 2,
-          username: "marie_martin",
-          email: "marie@example.com",
-          roles: ["user"],
-          sites: ["Marseille"],
-          status: "actif",
-          last_login: "2024-11-30T15:45:00Z"
-        },
-        {
-          id: 3,
-          username: "pierre_durand",
-          email: "pierre@example.com",
-          roles: ["moderator"],
-          sites: ["Nice", "Cannes"],
-          status: "suspendu",
-          last_login: "2024-11-25T09:15:00Z"
-        }
-      ])
-      setLoading(false)
-    }, 1000)
+    fetchUsers()
+    fetchRoles()
   }, [])
+
+  const fetchUsers = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+      const data = await apiFetch<User[]>('/admin/users/')
+      setUsers(data)
+    } catch (err) {
+      console.error('Error fetching users:', err)
+      const apiError = err as ApiError
+      setError(apiError?.detail || 'Failed to load users')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const fetchRoles = async () => {
+    try {
+      const data = await RolesApi.list()
+      setRoles(data)
+    } catch (err) {
+      console.error('Error fetching roles:', err)
+    }
+  }
 
   const filteredUsers = users.filter(user => {
     const matchesSearch = user.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -90,15 +78,6 @@ export default function UsersPage() {
     const matchesRole = roleFilter === 'all' || user.roles.includes(roleFilter)
     return matchesSearch && matchesStatus && matchesRole
   })
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'actif': return 'bg-green-100 text-green-800'
-      case 'suspendu': return 'bg-red-100 text-red-800'
-      case 'inactif': return 'bg-gray-100 text-gray-800'
-      default: return 'bg-gray-100 text-gray-800'
-    }
-  }
 
   const getRoleColor = (role: string) => {
     switch (role) {
@@ -124,6 +103,61 @@ export default function UsersPage() {
         ? [] 
         : filteredUsers.map(u => u.id)
     )
+  }
+
+  const handleCreateUser = async (userData: Record<string, unknown>) => {
+    try {
+      const response = await apiFetch('/admin/users/', {
+        method: 'POST',
+        body: JSON.stringify(userData)
+      })
+      console.log('User created successfully:', response)
+      await fetchUsers()
+      setModalOpen(false)
+    } catch (err) {
+      console.error('Error creating user:', err)
+      const apiError = err as ApiError
+      const errorMessage = apiError?.detail || apiError?.message || JSON.stringify(err) || 'Failed to create user'
+      alert(`Error: ${errorMessage}`)
+      throw err
+    }
+  }
+
+  const handleUpdateUser = async (updatedUser: User & { _delete?: boolean }) => {
+    console.log('handleUpdateUser called with:', updatedUser)
+    
+    if (updatedUser._delete) {
+      try {
+        console.log('Deleting user:', updatedUser.id)
+        await apiFetch(`/admin/users/${updatedUser.id}/`, {
+          method: 'DELETE'
+        })
+        setUsers(prev => prev.filter(user => user.id !== updatedUser.id))
+        setDetailsOpen(false)
+      } catch (err) {
+        console.error('Error deleting user:', err)
+        const apiError = err as ApiError
+        alert(apiError?.detail || 'Failed to delete user')
+        throw err
+      }
+    } else {
+      try {
+        console.log('Updating user with payload:', updatedUser)
+        const response = await apiFetch<User>(`/admin/users/${updatedUser.id}/`, {
+          method: 'PATCH',
+          body: JSON.stringify(updatedUser)
+        })
+        console.log('Update response:', response)
+        await fetchUsers()
+        setDetailsOpen(false)
+      } catch (err) {
+        console.error('Error updating user:', err)
+        const apiError = err as ApiError
+        const errorMsg = apiError?.detail || apiError?.message || 'Failed to update user'
+        alert(errorMsg)
+        throw err
+      }
+    }
   }
 
   if (loading) {
@@ -156,14 +190,17 @@ export default function UsersPage() {
               <p className="text-gray-600 mt-1">Gérez les comptes utilisateurs et leurs permissions</p>
             </div>
             <div className="flex gap-3">
-            <button
+              <button
                 className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
                 onClick={() => setRolesModalOpen(true)}
-            >
+              >
                 <Shield size={18} />
                 Gérer les rôles
-            </button>
-              <button onClick={() => setModalOpen(true)} className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm">
+              </button>
+              <button 
+                onClick={() => setModalOpen(true)} 
+                className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+              >
                 <Plus size={18} />
                 Nouvel utilisateur
               </button>
@@ -201,10 +238,9 @@ export default function UsersPage() {
                 className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               >
                 <option value="all">Tous les rôles</option>
-                <option value="admin">Admin</option>
-                <option value="manager">Manager</option>
-                <option value="moderator">Moderator</option>
-                <option value="user">User</option>
+                {roles.map(role => (
+                  <option key={role.id} value={role.name}>{role.name}</option>
+                ))}
               </select>
             </div>
           </div>
@@ -386,14 +422,14 @@ export default function UsersPage() {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                    <span className={`inline-block px-2 py-1 rounded-full text-xs font-bold ${
-                      user.status === 'actif'
-                        ? 'bg-green-100 text-green-700'
-                        : 'bg-red-100 text-red-700'
-                    }`}>
-                      {user.status === 'actif' ? 'Actif' : 'Suspendu'}
-                    </span>
-                  </td>
+                      <span className={`inline-block px-2 py-1 rounded-full text-xs font-bold ${
+                        user.status === 'actif'
+                          ? 'bg-green-100 text-green-700'
+                          : 'bg-red-100 text-red-700'
+                      }`}>
+                        {user.status === 'actif' ? 'Actif' : 'Suspendu'}
+                      </span>
+                    </td>
                     <td className="px-6 py-4 text-sm text-gray-500">
                       {user.last_login ? new Date(user.last_login).toLocaleDateString('fr-FR', {
                         day: '2-digit',
@@ -406,8 +442,9 @@ export default function UsersPage() {
                     <td className="px-6 py-4 text-right">
                       <div className="relative inline-block">
                         <button 
-                        onClick={() => { setSelectedUser(user); setDetailsOpen(true) }}
-                        className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                          onClick={() => { setSelectedUser(user); setDetailsOpen(true) }}
+                          className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                        >
                           <MoreVertical size={16} className="text-gray-400" />
                         </button>
                       </div>
@@ -429,29 +466,28 @@ export default function UsersPage() {
           )}
         </div>
       </div>
+      
       <UserDetailsModal
         open={detailsOpen}
         onClose={() => setDetailsOpen(false)}
         user={selectedUser}
-        allRoles={roles}
-        onUpdate={u => {
-          setUsers(prev =>
-            u._delete
-              ? prev.filter(user => user.id !== u.id)      // SUPPRIMER l'utilisateur
-              : prev.map(user => user.id === u.id ? { ...user, ...u } : user) // sinon, update normal
-          )
-        }}
+        allRoles={roles.map(r => ({ id: r.id, name: r.name }))}
+        onUpdate={handleUpdateUser}
       />
+      
       <CreateUserModal
-  open={modalOpen}
-  onClose={() => setModalOpen(false)}
-  onCreate={(user) => { 
-    // Ici tu pourras faire l’appel API pour ajouter
-    setUsers(prev => [...prev, { ...user, id: prev.length + 1 }]) // mock
-  }}
-/>
-<RolesModal open={rolesModalOpen} onClose={() => setRolesModalOpen(false)} />
-
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        onCreate={handleCreateUser}
+      />
+      
+      <RolesModal 
+        open={rolesModalOpen} 
+        onClose={() => {
+          setRolesModalOpen(false)
+          fetchRoles() // Refresh roles after modal closes
+        }} 
+      />
     </div>
   )
 }

@@ -35,7 +35,7 @@ type Props = {
 function generateId() {
   try {
     if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-      return (crypto as any).randomUUID();
+      return crypto.randomUUID();
     }
   } catch {}
   return `note_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
@@ -190,7 +190,7 @@ export default function ClientNotes({
     const headers = ["id", "date", "author", "pinned", "tags", "text"];
     const rows = items.map((n) =>
       headers.map((h) => {
-        const v = (n as any)[h];
+        const v = n[h as keyof NoteItem];
         if (v === undefined || v === null) return "";
         if (Array.isArray(v)) return v.join("|");
         return String(v).replace(/"/g, '""');
@@ -307,7 +307,7 @@ export default function ClientNotes({
                         <p className="text-sm text-gray-700 leading-relaxed">{n.text}</p>
                         {(n.tags ?? []).length > 0 && (
                           <div className="mt-2 flex items-center gap-2 flex-wrap">
-                            {n.tags.map((t) => (
+                            {(n.tags ?? []).map((t) => (
                               <span 
                                 key={t} 
                                 className="inline-flex items-center px-2 py-0.5 bg-gray-100 text-gray-700 rounded text-xs"
